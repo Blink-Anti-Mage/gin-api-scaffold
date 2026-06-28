@@ -21,6 +21,7 @@ type Envelope struct {
 type ErrorBody struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Details any    `json:"details,omitempty"`
 }
 
 func OK(c *gin.Context, data any) {
@@ -33,8 +34,9 @@ func Created(c *gin.Context, data any) {
 
 func JSON(c *gin.Context, status int, data any) {
 	c.JSON(status, Envelope{
-		Success: true,
-		Data:    data,
+		Success:   true,
+		Data:      data,
+		RequestID: c.Writer.Header().Get(RequestIDHeader),
 	})
 }
 
@@ -53,6 +55,7 @@ func Error(c *gin.Context, err error) {
 		Error: &ErrorBody{
 			Code:    appErr.Code,
 			Message: appErr.Message,
+			Details: appErr.Details,
 		},
 		RequestID: c.Writer.Header().Get(RequestIDHeader),
 	})

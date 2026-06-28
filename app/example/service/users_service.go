@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"net/mail"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/example/gin-api-scaffold/app/example/types"
 	"github.com/example/gin-api-scaffold/internal/apperr"
@@ -11,6 +13,8 @@ import (
 const (
 	DefaultUsersListLimit = 20
 	MaxUsersListLimit     = 100
+	maxUserNameLength     = 100
+	maxUserEmailLength    = 255
 )
 
 type UsersRepository interface {
@@ -71,18 +75,22 @@ func (s *UsersService) Get(ctx context.Context, id string) (types.User, error) {
 }
 
 func (s *UsersService) Create(ctx context.Context, input types.CreateUserInput) (types.User, error) {
-	return s.repo.Create(ctx, types.User{
-		Name:  strings.TrimSpace(input.Name),
-		Email: strings.ToLower(strings.TrimSpace(input.Email)),
-	})
+	user, err := normalizedUser(input.Name, input.Email)
+	if err != nil {
+		return types.User{}, err
+	}
+
+	return s.repo.Create(ctx, user)
 }
 
 func (s *UsersService) Update(ctx context.Context, input types.UpdateUserInput) (types.User, error) {
-	return s.repo.Update(ctx, types.User{
-		ID:    strings.TrimSpace(input.ID),
-		Name:  strings.TrimSpace(input.Name),
-		Email: strings.ToLower(strings.TrimSpace(input.Email)),
-	})
+	user, err := normalizedUser(input.Name, input.Email)
+	if err != nil {
+		return types.User{}, err
+	}
+	user.ID = strings.TrimSpace(input.ID)
+
+	return s.repo.Update(ctx, user)
 }
 
 func (s *UsersService) Delete(ctx context.Context, id string) error {
@@ -91,4 +99,33 @@ func (s *UsersService) Delete(ctx context.Context, id string) error {
 
 func (s *UsersService) Stats(ctx context.Context) (types.UserStats, error) {
 	return s.repo.Stats(ctx)
+}
+
+func normalizedUser(name string, email string) (types.User, error) {
+	name = strings.TrimSpace(name)
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	if name == "" {
+		return types.User{}, apperr.BadRequest("invalid_name", "name is required")
+	}
+	if utf8.RuneCountInString(name) > maxUserNameLength {
+		return types.User{}, apperr.BadRequest("invalid_name", "name too long")
+	}
+	if !validEmail(email) {
+		return types.User{}, apperr.BadRequest("invalid_email", "invalid email")
+	}
+
+	return types.User{
+		Name:  name,
+		Email: email,
+	}, nil
+}
+
+func validEmail(email string) bool {
+	if email == "" || len(email) > maxUserEmailLength || strings.ContainsAny(email, " \t\r\n") {
+		return false
+	}
+
+	address, err := mail.ParseAddress(email)
+	return err == nil && address.Address == email
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 type recordingUsersRepository struct {
 	list   func(context.Context, types.ListUsersFilter) (types.UserList, error)
+	create func(context.Context, types.User) (types.User, error)
 	update func(context.Context, types.User) (types.User, error)
 	delete func(context.Context, string) error
 }
@@ -26,8 +28,11 @@ func (r *recordingUsersRepository) Get(context.Context, string) (types.User, err
 	return types.User{}, nil
 }
 
-func (r *recordingUsersRepository) Create(context.Context, types.User) (types.User, error) {
-	return types.User{}, nil
+func (r *recordingUsersRepository) Create(ctx context.Context, user types.User) (types.User, error) {
+	if r.create == nil {
+		return types.User{}, nil
+	}
+	return r.create(ctx, user)
 }
 
 func (r *recordingUsersRepository) Update(ctx context.Context, user types.User) (types.User, error) {
@@ -125,6 +130,86 @@ func TestUsersServiceListRejectsInvalidCursor(t *testing.T) {
 	appErr := apperr.From(err)
 	if appErr.Code != "invalid_cursor" {
 		t.Fatalf("expected invalid_cursor, got %q", appErr.Code)
+	}
+}
+
+func TestUsersServiceCreateNormalizesInput(t *testing.T) {
+	var captured types.User
+	repo := &recordingUsersRepository{
+		create: func(_ context.Context, user types.User) (types.User, error) {
+			captured = user
+			return user, nil
+		},
+	}
+
+	user, err := NewUsersService(repo).Create(context.Background(), types.CreateUserInput{
+		Name:  " Ada Byron ",
+		Email: " ADA@EXAMPLE.COM ",
+	})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	if captured.Name != "Ada Byron" {
+		t.Fatalf("expected trimmed name, got %q", captured.Name)
+	}
+	if captured.Email != "ada@example.com" {
+		t.Fatalf("expected normalized email, got %q", captured.Email)
+	}
+	if user != captured {
+		t.Fatalf("expected returned user to match repository result")
+	}
+}
+
+func TestUsersServiceCreateValidatesInput(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       types.CreateUserInput
+		expected    string
+		expectedMsg string
+	}{
+		{
+			name:        "empty name",
+			input:       types.CreateUserInput{Name: "   ", Email: "ada@example.com"},
+			expected:    "invalid_name",
+			expectedMsg: "name is required",
+		},
+		{
+			name:        "name too long",
+			input:       types.CreateUserInput{Name: strings.Repeat("a", maxUserNameLength+1), Email: "ada@example.com"},
+			expected:    "invalid_name",
+			expectedMsg: "name too long",
+		},
+		{
+			name:        "invalid email",
+			input:       types.CreateUserInput{Name: "Ada Byron", Email: "not-an-email"},
+			expected:    "invalid_email",
+			expectedMsg: "invalid email",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &recordingUsersRepository{
+				create: func(context.Context, types.User) (types.User, error) {
+					t.Fatal("repository should not be called for invalid input")
+					return types.User{}, nil
+				},
+			}
+
+			_, err := NewUsersService(repo).Create(context.Background(), tt.input)
+			if err == nil {
+				t.Fatal("expected validation error")
+			}
+
+			appErr := apperr.From(err)
+			if appErr.Code != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, appErr.Code)
+			}
+			if appErr.Message != tt.expectedMsg {
+				t.Fatalf("expected message %q, got %q", tt.expectedMsg, appErr.Message)
+			}
+		})
 	}
 }
 

@@ -3,8 +3,8 @@ package types
 import "time"
 
 type CreateUserRequest struct {
-	Name  string `json:"name" binding:"required,min=2,max=64"`
-	Email string `json:"email" binding:"required,email,max=255"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 type CreateUserInput struct {
@@ -13,8 +13,8 @@ type CreateUserInput struct {
 }
 
 type UpdateUserRequest struct {
-	Name  string `json:"name" binding:"required,min=2,max=64"`
-	Email string `json:"email" binding:"required,email,max=255"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
 }
 
 type UpdateUserInput struct {

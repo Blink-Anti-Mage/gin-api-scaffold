@@ -10,6 +10,7 @@ type Error struct {
 	Status  int
 	Code    string
 	Message string
+	Details any
 	Err     error
 }
 
@@ -18,6 +19,15 @@ func New(status int, code string, message string) *Error {
 		Status:  status,
 		Code:    code,
 		Message: message,
+	}
+}
+
+func NewWithDetails(status int, code string, message string, details any) *Error {
+	return &Error{
+		Status:  status,
+		Code:    code,
+		Message: message,
+		Details: details,
 	}
 }
 
@@ -49,6 +59,10 @@ func (e *Error) Unwrap() error {
 
 func BadRequest(code string, message string) *Error {
 	return New(http.StatusBadRequest, code, message)
+}
+
+func BadRequestWithDetails(code string, message string, details any) *Error {
+	return NewWithDetails(http.StatusBadRequest, code, message, details)
 }
 
 func Unauthorized(message string) *Error {
