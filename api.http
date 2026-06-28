@@ -1,6 +1,7 @@
 # Works with VS Code REST Client and JetBrains HTTP Client.
 
 @baseUrl = http://127.0.0.1:5678
+@userId = paste-user-id-here
 
 ### Health: liveness
 GET {{baseUrl}}/healthz
@@ -17,11 +18,29 @@ Content-Type: application/json
   "email": "ada-{{$timestamp}}@example.com"
 }
 
+### Get user by id
+GET {{baseUrl}}/api/v1/users/{{userId}}
+
+### Update user by id
+PUT {{baseUrl}}/api/v1/users/{{userId}}
+Content-Type: application/json
+
+{
+  "name": "Ada Byron",
+  "email": "ada.byron-{{$timestamp}}@example.com"
+}
+
+### Delete user by id
+DELETE {{baseUrl}}/api/v1/users/{{userId}}
+
 ### List users
 GET {{baseUrl}}/api/v1/users
 
-### Search users with pagination
-GET {{baseUrl}}/api/v1/users?search=ada&limit=10&offset=0
+### Search users with cursor pagination
+GET {{baseUrl}}/api/v1/users?search=ada&limit=10
+
+### Next users page, paste next_cursor from the previous response
+GET {{baseUrl}}/api/v1/users?search=ada&limit=10&cursor=
 
 ### User stats
 GET {{baseUrl}}/api/v1/users/stats

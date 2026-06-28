@@ -12,10 +12,27 @@ type CreateUserInput struct {
 	Email string
 }
 
+type UpdateUserRequest struct {
+	Name  string `json:"name" binding:"required,min=2,max=64"`
+	Email string `json:"email" binding:"required,email,max=255"`
+}
+
+type UpdateUserInput struct {
+	ID    string
+	Name  string
+	Email string
+}
+
 type ListUsersFilter struct {
 	Search string
 	Limit  int
-	Offset int
+	Cursor string
+	After  *ListUsersCursor
+}
+
+type ListUsersCursor struct {
+	CreatedAt time.Time
+	ID        string
 }
 
 type User struct {
@@ -26,10 +43,9 @@ type User struct {
 }
 
 type UserList struct {
-	Items  []User `json:"items"`
-	Total  int64  `json:"total"`
-	Limit  int    `json:"limit"`
-	Offset int    `json:"offset"`
+	Items      []User `json:"items"`
+	Limit      int    `json:"limit"`
+	NextCursor string `json:"next_cursor,omitempty"`
 }
 
 type UserStats struct {

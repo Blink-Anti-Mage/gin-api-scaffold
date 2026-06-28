@@ -92,8 +92,13 @@ func registerUserRoutes(router *gin.RouterGroup, usersService *service.UsersServ
 	usersHandler := handler.NewUsersHandler(usersService)
 
 	users := router.Group("/users")
-	users.GET("", usersHandler.List)
+	users.GET("", middleware.CursorPagination(middleware.CursorPaginationConfig{
+		DefaultLimit: service.DefaultUsersListLimit,
+		MaxLimit:     service.MaxUsersListLimit,
+	}), usersHandler.List)
 	users.POST("", usersHandler.Create)
 	users.GET("/stats", usersHandler.Stats)
 	users.GET("/:id", usersHandler.Get)
+	users.PUT("/:id", usersHandler.Update)
+	users.DELETE("/:id", usersHandler.Delete)
 }

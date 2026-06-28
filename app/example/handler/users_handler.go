@@ -9,6 +9,7 @@ import (
 	"github.com/example/gin-api-scaffold/app/example/types"
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/httpx"
+	"github.com/example/gin-api-scaffold/internal/middleware"
 )
 
 type UsersHandler struct {
@@ -22,11 +23,7 @@ func NewUsersHandler(service *service.UsersService) *UsersHandler {
 }
 
 func (h *UsersHandler) List(c *gin.Context) {
-	filter, ok := listUsersFilter(c)
-	if !ok {
-		return
-	}
-
+	filter := listUsersFilter(c)
 	users, err := h.service.List(c.Request.Context(), filter)
 	if err != nil {
 		httpx.Error(c, err)
@@ -80,20 +77,52 @@ func (h *UsersHandler) Create(c *gin.Context) {
 	httpx.Created(c, user)
 }
 
-func listUsersFilter(c *gin.Context) (types.ListUsersFilter, bool) {
-	limit, ok := optionalQueryInt(c, "limit")
-	if !ok {
-		return types.ListUsersFilter{}, false
+func (h *UsersHandler) Update(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		httpx.Error(c, apperr.BadRequest("missing_user_id", "missing user id"))
+		return
 	}
 
-	offset, ok := optionalQueryInt(c, "offset")
-	if !ok {
-		return types.ListUsersFilter{}, false
+	var req types.UpdateUserRequest
+	if !httpx.BindJSON(c, &req) {
+		return
 	}
+
+	user, err := h.service.Update(c.Request.Context(), types.UpdateUserInput{
+		ID:    id,
+		Name:  req.Name,
+		Email: req.Email,
+	})
+	if err != nil {
+		httpx.Error(c, err)
+		return
+	}
+
+	httpx.OK(c, user)
+}
+
+func (h *UsersHandler) Delete(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		httpx.Error(c, apperr.BadRequest("missing_user_id", "missing user id"))
+		return
+	}
+
+	if err := h.service.Delete(c.Request.Context(), id); err != nil {
+		httpx.Error(c, err)
+		return
+	}
+
+	httpx.NoContent(c)
+}
+
+func listUsersFilter(c *gin.Context) types.ListUsersFilter {
+	pagination, _ := middleware.CurrentCursorPagination(c)
 
 	return types.ListUsersFilter{
 		Search: strings.TrimSpace(c.Query("search")),
-		Limit:  limit,
-		Offset: offset,
-	}, true
+		Limit:  pagination.Limit,
+		Cursor: pagination.Cursor,
+	}
 }

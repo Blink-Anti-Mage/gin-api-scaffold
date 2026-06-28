@@ -34,24 +34,22 @@ func NewPostgresUsersRepository(pool *pgxpool.Pool) *PostgresUsersRepository {
 func (r *PostgresUsersRepository) List(ctx context.Context, filter types.ListUsersFilter) (types.UserList, error) {
 	search := strings.TrimSpace(filter.Search)
 
-	var total int64
-	if err := r.pool.QueryRow(ctx, `
-SELECT count(*)
-FROM users
-WHERE NULLIF($1, '') IS NULL
-   OR name ILIKE '%' || $1 || '%'
-   OR email ILIKE '%' || $1 || '%'`, search).Scan(&total); err != nil {
-		return types.UserList{}, err
+	var afterCreatedAt any
+	var afterID string
+	if filter.After != nil {
+		afterCreatedAt = filter.After.CreatedAt
+		afterID = filter.After.ID
 	}
 
 	rows, err := r.pool.Query(ctx, `
 SELECT id, name, email, created_at
 FROM users
-WHERE NULLIF($1, '') IS NULL
+WHERE (NULLIF($1, '') IS NULL
    OR name ILIKE '%' || $1 || '%'
-   OR email ILIKE '%' || $1 || '%'
+   OR email ILIKE '%' || $1 || '%')
+  AND ($2::timestamptz IS NULL OR (created_at, id) > ($2::timestamptz, $3::text))
 ORDER BY created_at ASC, id ASC
-LIMIT $2 OFFSET $3`, search, filter.Limit, filter.Offset)
+LIMIT $4`, search, afterCreatedAt, afterID, filter.Limit)
 	if err != nil {
 		return types.UserList{}, err
 	}
@@ -70,10 +68,8 @@ LIMIT $2 OFFSET $3`, search, filter.Limit, filter.Offset)
 	}
 
 	return types.UserList{
-		Items:  users,
-		Total:  total,
-		Limit:  filter.Limit,
-		Offset: filter.Offset,
+		Items: users,
+		Limit: filter.Limit,
 	}, nil
 }
 
@@ -112,6 +108,38 @@ RETURNING id, name, email, created_at`,
 	}
 
 	return user, nil
+}
+
+func (r *PostgresUsersRepository) Update(ctx context.Context, user types.User) (types.User, error) {
+	err := r.pool.QueryRow(ctx, `
+UPDATE users
+SET name = $2,
+    email = $3
+WHERE id = $1
+RETURNING id, name, email, created_at`,
+		user.ID,
+		user.Name,
+		user.Email,
+	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
+	if err != nil {
+		return types.User{}, mapUserPostgresError(err)
+	}
+
+	return user, nil
+}
+
+func (r *PostgresUsersRepository) Delete(ctx context.Context, id string) error {
+	tag, err := r.pool.Exec(ctx, `
+DELETE FROM users
+WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apperr.NotFound("user")
+	}
+
+	return nil
 }
 
 func (r *PostgresUsersRepository) Stats(ctx context.Context) (types.UserStats, error) {

@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique ON users (lower(email));
-CREATE INDEX IF NOT EXISTS users_created_at_idx ON users (created_at);
+CREATE INDEX IF NOT EXISTS users_created_at_id_idx ON users (created_at, id);
