@@ -1,0 +1,27 @@
+# Works with VS Code REST Client and JetBrains HTTP Client.
+
+@baseUrl = http://127.0.0.1:5678
+
+### Health: liveness
+GET {{baseUrl}}/healthz
+
+### Health: readiness, checks PostgreSQL connection
+GET {{baseUrl}}/readyz
+
+### Create user, run this before list/search examples
+POST {{baseUrl}}/api/v1/users
+Content-Type: application/json
+
+{
+  "name": "Ada Lovelace",
+  "email": "ada-{{$timestamp}}@example.com"
+}
+
+### List users
+GET {{baseUrl}}/api/v1/users
+
+### Search users with pagination
+GET {{baseUrl}}/api/v1/users?search=ada&limit=10&offset=0
+
+### User stats
+GET {{baseUrl}}/api/v1/users/stats

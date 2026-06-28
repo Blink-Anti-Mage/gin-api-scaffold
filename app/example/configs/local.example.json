@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "gin-api",
+    "env": "local"
+  },
+  "http": {
+    "host": "0.0.0.0",
+    "port": "5678",
+    "max_body_bytes": 1048576,
+    "read_header_timeout": "5s",
+    "read_timeout": "10s",
+    "write_timeout": "10s",
+    "idle_timeout": "60s",
+    "shutdown_timeout": "10s"
+  },
+  "database": {
+    "dsn": "postgres://app:app@postgres:5432/app?sslmode=disable",
+    "max_conns": 10,
+    "min_conns": 1,
+    "max_conn_lifetime": "1h",
+    "max_conn_idle_time": "30m",
+    "health_check_period": "1m",
+    "connect_timeout": "5s"
+  },
+  "cors": {
+    "allowed_origins": ["http://localhost:3000", "http://localhost:5173"],
+    "allowed_methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    "allowed_headers": ["Authorization", "Content-Type", "X-Request-Id"],
+    "allow_credentials": false,
+    "max_age": "12h"
+  },
+  "rate_limit": {
+    "enabled": true,
+    "requests": 120,
+    "window": "1m"
+  },
+  "auth": {
+    "enabled": false,
+    "secret": "",
+    "issuer": "gin-api",
+    "audience": "api-clients",
+    "clock_skew": "30s"
+  },
+  "log": {
+    "level": "info"
+  }
+}
