@@ -1,9 +1,6 @@
 package middleware
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
@@ -36,62 +34,29 @@ type JWTClaims struct {
 	Raw       map[string]any
 }
 
-type rawJWTHeader struct {
-	Algorithm string `json:"alg"`
-	Type      string `json:"typ"`
+type jwtTokenClaims struct {
+	jwt.RegisteredClaims
+	Roles  []string       `json:"roles"`
+	Scopes []string       `json:"scopes"`
+	Scope  string         `json:"scope"`
+	Raw    map[string]any `json:"-"`
 }
 
-type rawJWTClaims struct {
-	Subject   string       `json:"sub"`
-	Issuer    string       `json:"iss"`
-	Audience  audienceList `json:"aud"`
-	ExpiresAt *numericDate `json:"exp"`
-	NotBefore *numericDate `json:"nbf"`
-	IssuedAt  *numericDate `json:"iat"`
-	JWTID     string       `json:"jti"`
-	Roles     []string     `json:"roles"`
-	Scopes    []string     `json:"scopes"`
-	Scope     string       `json:"scope"`
-}
+type jwtTokenClaimsAlias jwtTokenClaims
 
-type numericDate struct {
-	time.Time
-}
-
-func (d *numericDate) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
-		return nil
-	}
-
-	var seconds json.Number
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
-	decoder.UseNumber()
-	if err := decoder.Decode(&seconds); err != nil {
+func (c *jwtTokenClaims) UnmarshalJSON(data []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	value, err := seconds.Int64()
-	if err != nil {
+	var claims jwtTokenClaimsAlias
+	if err := json.Unmarshal(data, &claims); err != nil {
 		return err
 	}
-	d.Time = time.Unix(value, 0).UTC()
-	return nil
-}
 
-type audienceList []string
-
-func (a *audienceList) UnmarshalJSON(data []byte) error {
-	var single string
-	if err := json.Unmarshal(data, &single); err == nil {
-		*a = audienceList{single}
-		return nil
-	}
-
-	var many []string
-	if err := json.Unmarshal(data, &many); err != nil {
-		return err
-	}
-	*a = many
+	*c = jwtTokenClaims(claims)
+	c.Raw = raw
 	return nil
 }
 
@@ -131,51 +96,68 @@ func CurrentSubject(c *gin.Context) (string, bool) {
 }
 
 func parseAndValidateJWT(token string, cfg config.AuthConfig, now time.Time) (JWTClaims, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return JWTClaims{}, errors.New("jwt must contain header, payload, and signature")
-	}
-
-	headerJSON, err := decodeJWTPart(parts[0])
+	parsed := &jwtTokenClaims{}
+	jwtToken, err := jwt.ParseWithClaims(token, parsed, jwtKeyFunc(cfg), jwtParserOptions(cfg, now)...)
 	if err != nil {
-		return JWTClaims{}, fmt.Errorf("decode jwt header: %w", err)
+		return JWTClaims{}, err
+	}
+	if jwtToken == nil || !jwtToken.Valid {
+		return JWTClaims{}, errors.New("jwt is invalid")
 	}
 
-	var header rawJWTHeader
-	if err := json.Unmarshal(headerJSON, &header); err != nil {
-		return JWTClaims{}, fmt.Errorf("parse jwt header: %w", err)
-	}
-	if header.Algorithm != "HS256" {
-		return JWTClaims{}, fmt.Errorf("unsupported jwt alg %q", header.Algorithm)
+	claims := jwtClaimsFromTokenClaims(parsed)
+	if claims.Subject == "" {
+		return JWTClaims{}, errors.New("jwt sub claim is required")
 	}
 
-	if !validHMACSHA256(parts[0]+"."+parts[1], parts[2], cfg.Secret) {
-		return JWTClaims{}, errors.New("jwt signature mismatch")
+	return claims, nil
+}
+
+func jwtParserOptions(cfg config.AuthConfig, now time.Time) []jwt.ParserOption {
+	skew := cfg.ClockSkew
+	if skew < 0 {
+		skew = 0
 	}
 
-	payloadJSON, err := decodeJWTPart(parts[1])
-	if err != nil {
-		return JWTClaims{}, fmt.Errorf("decode jwt payload: %w", err)
+	options := []jwt.ParserOption{
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithExpirationRequired(),
+		jwt.WithIssuedAt(),
+		jwt.WithLeeway(skew),
+		jwt.WithTimeFunc(func() time.Time {
+			return now
+		}),
 	}
-
-	var raw map[string]any
-	if err := json.Unmarshal(payloadJSON, &raw); err != nil {
-		return JWTClaims{}, fmt.Errorf("parse jwt raw claims: %w", err)
+	if cfg.Issuer != "" {
+		options = append(options, jwt.WithIssuer(cfg.Issuer))
 	}
-
-	var parsed rawJWTClaims
-	if err := json.Unmarshal(payloadJSON, &parsed); err != nil {
-		return JWTClaims{}, fmt.Errorf("parse jwt claims: %w", err)
+	if cfg.Audience != "" {
+		options = append(options, jwt.WithAudience(cfg.Audience))
 	}
+	return options
+}
 
+func jwtKeyFunc(cfg config.AuthConfig) jwt.Keyfunc {
+	return func(token *jwt.Token) (any, error) {
+		if token.Method == nil {
+			return nil, errors.New("missing jwt signing method")
+		}
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, fmt.Errorf("unexpected jwt signing method %s", token.Method.Alg())
+		}
+		return []byte(cfg.Secret), nil
+	}
+}
+
+func jwtClaimsFromTokenClaims(parsed *jwtTokenClaims) JWTClaims {
 	claims := JWTClaims{
 		Subject:  strings.TrimSpace(parsed.Subject),
 		Issuer:   parsed.Issuer,
 		Audience: []string(parsed.Audience),
-		JWTID:    parsed.JWTID,
+		JWTID:    parsed.ID,
 		Roles:    parsed.Roles,
 		Scopes:   normalizedScopes(parsed.Scopes, parsed.Scope),
-		Raw:      raw,
+		Raw:      parsed.Raw,
 	}
 	if parsed.ExpiresAt != nil {
 		claims.ExpiresAt = parsed.ExpiresAt.Time
@@ -188,43 +170,7 @@ func parseAndValidateJWT(token string, cfg config.AuthConfig, now time.Time) (JW
 		issuedAt := parsed.IssuedAt.Time
 		claims.IssuedAt = &issuedAt
 	}
-
-	if err := validateJWTClaims(claims, cfg, now); err != nil {
-		return JWTClaims{}, err
-	}
-
-	return claims, nil
-}
-
-func validateJWTClaims(claims JWTClaims, cfg config.AuthConfig, now time.Time) error {
-	skew := cfg.ClockSkew
-	if skew < 0 {
-		skew = 0
-	}
-
-	if claims.Subject == "" {
-		return errors.New("jwt sub claim is required")
-	}
-	if claims.ExpiresAt.IsZero() {
-		return errors.New("jwt exp claim is required")
-	}
-	if now.After(claims.ExpiresAt.Add(skew)) {
-		return errors.New("jwt is expired")
-	}
-	if claims.NotBefore != nil && now.Add(skew).Before(*claims.NotBefore) {
-		return errors.New("jwt is not valid yet")
-	}
-	if claims.IssuedAt != nil && now.Add(skew).Before(*claims.IssuedAt) {
-		return errors.New("jwt was issued in the future")
-	}
-	if cfg.Issuer != "" && claims.Issuer != cfg.Issuer {
-		return errors.New("jwt issuer mismatch")
-	}
-	if cfg.Audience != "" && !containsString(claims.Audience, cfg.Audience) {
-		return errors.New("jwt audience mismatch")
-	}
-
-	return nil
+	return claims
 }
 
 func bearerToken(header string) (string, bool) {
@@ -237,23 +183,6 @@ func bearerToken(header string) (string, bool) {
 
 	token := strings.TrimSpace(header[len(prefix):])
 	return token, token != ""
-}
-
-func validHMACSHA256(signingInput string, signature string, secret string) bool {
-	decodedSignature, err := base64.RawURLEncoding.DecodeString(signature)
-	if err != nil {
-		return false
-	}
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(signingInput))
-	expectedSignature := mac.Sum(nil)
-
-	return hmac.Equal(decodedSignature, expectedSignature)
-}
-
-func decodeJWTPart(part string) ([]byte, error) {
-	return base64.RawURLEncoding.DecodeString(part)
 }
 
 func normalizedScopes(scopes []string, scope string) []string {
@@ -270,15 +199,6 @@ func normalizedScopes(scopes []string, scope string) []string {
 		}
 	}
 	return result
-}
-
-func containsString(items []string, expected string) bool {
-	for _, item := range items {
-		if item == expected {
-			return true
-		}
-	}
-	return false
 }
 
 func unauthorized(c *gin.Context, code string, message string) {

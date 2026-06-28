@@ -1,10 +1,6 @@
 package middleware
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/example/gin-api-scaffold/internal/config"
 )
@@ -125,25 +122,9 @@ func TestJWTMiddlewareRejectsExpiredToken(t *testing.T) {
 func signTestJWT(t *testing.T, secret string, payload map[string]any) string {
 	t.Helper()
 
-	headerJSON, err := json.Marshal(map[string]string{
-		"alg": "HS256",
-		"typ": "JWT",
-	})
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims(payload)).SignedString([]byte(secret))
 	if err != nil {
-		t.Fatalf("marshal header: %v", err)
+		t.Fatalf("sign jwt: %v", err)
 	}
-	payloadJSON, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-
-	header := base64.RawURLEncoding.EncodeToString(headerJSON)
-	body := base64.RawURLEncoding.EncodeToString(payloadJSON)
-	signingInput := header + "." + body
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(signingInput))
-	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-
-	return signingInput + "." + signature
+	return token
 }

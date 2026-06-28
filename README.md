@@ -13,7 +13,7 @@
 - CORS
 - Body size limit
 - Rate limit
-- JWT middleware
+- JWT middleware based on `golang-jwt/jwt/v5`
 - Cursor pagination middleware
 - Health check
 - Standard response envelope
@@ -62,6 +62,39 @@ users.GET("", middleware.CursorPagination(middleware.CursorPaginationConfig{
 	MaxLimit:     service.MaxUsersListLimit,
 }), usersHandler.List)
 ```
+
+## JWT 规矩
+
+JWT middleware 使用 `github.com/golang-jwt/jwt/v5`，不要手写 base64、claims 解析或 HMAC 验签。
+
+当前约定：
+
+- token 从 `Authorization: Bearer <token>` 读取。
+- 只接受 `HS256`。
+- 签名 secret 来自 `config.Auth.Secret`。
+- 必须包含 `sub`。
+- 必须包含 `exp`。
+- 会校验 `exp`、`nbf`、`iat`、`iss`、`aud`。
+- `iss` 和 `aud` 只有在配置中非空时才要求匹配。
+- `clock_skew` 通过 jwt parser leeway 处理。
+- 解析后的 claims 存入 Gin context：
+  - `middleware.CurrentJWTClaims(c)`
+  - `middleware.CurrentSubject(c)`
+
+认证失败统一返回：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "invalid_token",
+    "message": "invalid or expired token"
+  },
+  "request_id": "..."
+}
+```
+
+没有 Bearer token 时返回 `missing_token`。
 
 ## 响应规矩
 
