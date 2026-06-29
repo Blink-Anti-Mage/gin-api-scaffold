@@ -3,13 +3,15 @@ package types
 import "time"
 
 type CreateUserRequest struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password" binding:"required,min=8,max=72"`
 }
 
 type CreateUserInput struct {
-	Name  string
-	Email string
+	Name     string
+	Email    string
+	Password string
 }
 
 type UpdateUserRequest struct {
@@ -36,10 +38,11 @@ type ListUsersCursor struct {
 }
 
 type User struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"-"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type UserList struct {

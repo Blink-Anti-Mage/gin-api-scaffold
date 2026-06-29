@@ -119,6 +119,42 @@ func TestJWTMiddlewareRejectsExpiredToken(t *testing.T) {
 	}
 }
 
+func TestRejectRevokedJWTRejectsRevokedToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := config.AuthConfig{Secret: testJWTSecret}
+	router := gin.New()
+	router.Use(JWT(cfg))
+	router.Use(RejectRevokedJWT(revokedJWTChecker{}))
+	router.GET("/me", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token := signTestJWT(t, testJWTSecret, map[string]any{
+		"sub": "user-123",
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"jti": "revoked-token",
+	})
+	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"revoked_token"`) {
+		t.Fatalf("unexpected body: %s", rec.Body.String())
+	}
+}
+
+type revokedJWTChecker struct{}
+
+func (revokedJWTChecker) IsRevoked(claims JWTClaims) bool {
+	return claims.JWTID == "revoked-token"
+}
+
 func signTestJWT(t *testing.T, secret string, payload map[string]any) string {
 	t.Helper()
 

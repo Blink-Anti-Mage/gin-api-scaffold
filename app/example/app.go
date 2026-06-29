@@ -32,11 +32,13 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 	}
 
 	usersService := service.NewUsersService(repos.Users)
+	authService := service.NewAuthService(cfg.Auth, repos.Auth)
 	router := NewRouter(RouterDeps{
 		Config:        cfg,
 		Logger:        logger,
 		Database:      postgres,
 		UsersService:  usersService,
+		AuthService:   authService,
 		ReadinessName: "postgres",
 	})
 
@@ -96,8 +98,10 @@ func buildRepositories(cfg config.Config, logger *slog.Logger) (repository.Repos
 	}
 	logger.Info("postgres_connected")
 
+	usersRepo := repository.NewPostgresUsersRepository(pool)
 	return repository.Repositories{
-		Users: repository.NewPostgresUsersRepository(pool),
+		Users: usersRepo,
+		Auth:  usersRepo,
 	}, pool, nil
 }
 

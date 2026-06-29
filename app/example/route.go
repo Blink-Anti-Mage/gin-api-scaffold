@@ -21,11 +21,13 @@ type RouterDeps struct {
 	Logger        *slog.Logger
 	Database      Pinger
 	UsersService  *service.UsersService
+	AuthService   *service.AuthService
 	ReadinessName string
 }
 
 type RouteDeps struct {
 	UsersService *service.UsersService
+	AuthService  *service.AuthService
 }
 
 type Pinger interface {
@@ -65,11 +67,19 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 
 	v1 := router.Group("/api/v1")
 	v1.Use(middleware.RateLimit(deps.Config.RateLimit))
-	if deps.Config.Auth.Enabled {
-		v1.Use(middleware.JWT(deps.Config.Auth))
+
+	if deps.AuthService != nil {
+		registerPublicAuthRoutes(v1, deps.AuthService)
 	}
-	RegisterRoutes(v1, RouteDeps{
+
+	protected := v1.Group("")
+	if deps.Config.Auth.Enabled {
+		protected.Use(middleware.JWT(deps.Config.Auth))
+		protected.Use(middleware.RejectRevokedJWT(deps.AuthService))
+	}
+	RegisterRoutes(protected, RouteDeps{
 		UsersService: deps.UsersService,
+		AuthService:  deps.AuthService,
 	})
 
 	router.NoRoute(func(c *gin.Context) {
@@ -83,9 +93,27 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 }
 
 func RegisterRoutes(router *gin.RouterGroup, deps RouteDeps) {
+	if deps.AuthService != nil {
+		registerProtectedAuthRoutes(router, deps.AuthService)
+	}
 	if deps.UsersService != nil {
 		registerUserRoutes(router, deps.UsersService)
 	}
+}
+
+func registerPublicAuthRoutes(router *gin.RouterGroup, authService *service.AuthService) {
+	authHandler := handler.NewAuthHandler(authService)
+
+	auth := router.Group("/auth")
+	auth.POST("/login", authHandler.Login)
+}
+
+func registerProtectedAuthRoutes(router *gin.RouterGroup, authService *service.AuthService) {
+	authHandler := handler.NewAuthHandler(authService)
+
+	auth := router.Group("/auth")
+	auth.POST("/logout", authHandler.Logout)
+	auth.GET("/me", authHandler.Me)
 }
 
 func registerUserRoutes(router *gin.RouterGroup, usersService *service.UsersService) {

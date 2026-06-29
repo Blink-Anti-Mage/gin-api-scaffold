@@ -66,8 +66,9 @@ func (h *UsersHandler) Create(c *gin.Context) {
 	}
 
 	user, err := h.service.Create(c.Request.Context(), types.CreateUserInput{
-		Name:  req.Name,
-		Email: req.Email,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
 	})
 	if err != nil {
 		httpx.Error(c, err)

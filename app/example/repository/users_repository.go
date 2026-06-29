@@ -20,6 +20,7 @@ import (
 )
 
 var _ service.UsersRepository = (*PostgresUsersRepository)(nil)
+var _ service.AuthRepository = (*PostgresUsersRepository)(nil)
 
 type PostgresUsersRepository struct {
 	pool *pgxpool.Pool
@@ -95,12 +96,13 @@ func (r *PostgresUsersRepository) Create(ctx context.Context, user types.User) (
 	}
 
 	err := r.pool.QueryRow(ctx, `
-INSERT INTO users (id, name, email, created_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO users (id, name, email, password_hash, created_at)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, name, email, created_at`,
 		user.ID,
 		user.Name,
 		user.Email,
+		user.PasswordHash,
 		user.CreatedAt,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err != nil {
@@ -140,6 +142,19 @@ WHERE id = $1`, id)
 	}
 
 	return nil
+}
+
+func (r *PostgresUsersRepository) GetByEmail(ctx context.Context, email string) (types.AuthUser, error) {
+	var user types.AuthUser
+	err := r.pool.QueryRow(ctx, `
+SELECT id, name, email, password_hash
+FROM users
+WHERE lower(email) = lower($1)`, email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash)
+	if err != nil {
+		return types.AuthUser{}, mapUserPostgresError(err)
+	}
+
+	return user, nil
 }
 
 func (r *PostgresUsersRepository) Stats(ctx context.Context) (types.UserStats, error) {

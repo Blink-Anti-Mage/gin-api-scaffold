@@ -44,6 +44,10 @@ type jwtTokenClaims struct {
 
 type jwtTokenClaimsAlias jwtTokenClaims
 
+type TokenRevocationChecker interface {
+	IsRevoked(claims JWTClaims) bool
+}
+
 func (c *jwtTokenClaims) UnmarshalJSON(data []byte) error {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -76,6 +80,23 @@ func JWT(cfg config.AuthConfig) gin.HandlerFunc {
 
 		c.Set(AuthClaimsKey, claims)
 		c.Set(AuthSubjectKey, claims.Subject)
+		c.Next()
+	}
+}
+
+func RejectRevokedJWT(checker TokenRevocationChecker) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if checker == nil {
+			c.Next()
+			return
+		}
+
+		claims, ok := CurrentJWTClaims(c)
+		if ok && checker.IsRevoked(claims) {
+			unauthorized(c, "revoked_token", "token has been revoked")
+			return
+		}
+
 		c.Next()
 	}
 }

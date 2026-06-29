@@ -8,6 +8,7 @@ import (
 
 	"github.com/example/gin-api-scaffold/app/example/types"
 	"github.com/example/gin-api-scaffold/internal/apperr"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -15,6 +16,8 @@ const (
 	MaxUsersListLimit     = 100
 	maxUserNameLength     = 100
 	maxUserEmailLength    = 255
+	minUserPasswordLength = 8
+	maxUserPasswordLength = 72
 )
 
 type UsersRepository interface {
@@ -80,6 +83,12 @@ func (s *UsersService) Create(ctx context.Context, input types.CreateUserInput) 
 		return types.User{}, err
 	}
 
+	passwordHash, err := hashPassword(input.Password)
+	if err != nil {
+		return types.User{}, err
+	}
+	user.PasswordHash = passwordHash
+
 	return s.repo.Create(ctx, user)
 }
 
@@ -128,4 +137,33 @@ func validEmail(email string) bool {
 
 	address, err := mail.ParseAddress(email)
 	return err == nil && address.Address == email
+}
+
+func hashPassword(password string) (string, error) {
+	if err := validatePassword(password); err != nil {
+		return "", err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", apperr.Internal(err)
+	}
+	return string(hash), nil
+}
+
+func passwordMatches(passwordHash string, password string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) == nil
+}
+
+func validatePassword(password string) error {
+	if password == "" {
+		return apperr.BadRequest("invalid_password", "password is required")
+	}
+	if len(password) < minUserPasswordLength {
+		return apperr.BadRequest("invalid_password", "password too short")
+	}
+	if len(password) > maxUserPasswordLength {
+		return apperr.BadRequest("invalid_password", "password too long")
+	}
+	return nil
 }

@@ -143,8 +143,9 @@ func TestUsersServiceCreateNormalizesInput(t *testing.T) {
 	}
 
 	user, err := NewUsersService(repo).Create(context.Background(), types.CreateUserInput{
-		Name:  " Ada Byron ",
-		Email: " ADA@EXAMPLE.COM ",
+		Name:     " Ada Byron ",
+		Email:    " ADA@EXAMPLE.COM ",
+		Password: "valid-password",
 	})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
@@ -155,6 +156,9 @@ func TestUsersServiceCreateNormalizesInput(t *testing.T) {
 	}
 	if captured.Email != "ada@example.com" {
 		t.Fatalf("expected normalized email, got %q", captured.Email)
+	}
+	if !passwordMatches(captured.PasswordHash, "valid-password") {
+		t.Fatal("expected bcrypt password hash")
 	}
 	if user != captured {
 		t.Fatalf("expected returned user to match repository result")
@@ -170,21 +174,27 @@ func TestUsersServiceCreateValidatesInput(t *testing.T) {
 	}{
 		{
 			name:        "empty name",
-			input:       types.CreateUserInput{Name: "   ", Email: "ada@example.com"},
+			input:       types.CreateUserInput{Name: "   ", Email: "ada@example.com", Password: "valid-password"},
 			expected:    "invalid_name",
 			expectedMsg: "name is required",
 		},
 		{
 			name:        "name too long",
-			input:       types.CreateUserInput{Name: strings.Repeat("a", maxUserNameLength+1), Email: "ada@example.com"},
+			input:       types.CreateUserInput{Name: strings.Repeat("a", maxUserNameLength+1), Email: "ada@example.com", Password: "valid-password"},
 			expected:    "invalid_name",
 			expectedMsg: "name too long",
 		},
 		{
 			name:        "invalid email",
-			input:       types.CreateUserInput{Name: "Ada Byron", Email: "not-an-email"},
+			input:       types.CreateUserInput{Name: "Ada Byron", Email: "not-an-email", Password: "valid-password"},
 			expected:    "invalid_email",
 			expectedMsg: "invalid email",
+		},
+		{
+			name:        "password too short",
+			input:       types.CreateUserInput{Name: "Ada Byron", Email: "ada@example.com", Password: "short"},
+			expected:    "invalid_password",
+			expectedMsg: "password too short",
 		},
 	}
 
