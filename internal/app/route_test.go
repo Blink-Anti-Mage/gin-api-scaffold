@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"github.com/example/gin-api-scaffold/internal/config"
-	authmodel "github.com/example/gin-api-scaffold/internal/models/auth"
-	authservice "github.com/example/gin-api-scaffold/internal/services/auth"
+	"github.com/example/gin-api-scaffold/internal/models"
+	"github.com/example/gin-api-scaffold/internal/services"
 )
 
 type routeTestAuthRepository struct{}
 
-func (routeTestAuthRepository) GetByEmail(ctx context.Context, email string) (authmodel.AuthUser, error) {
-	return authmodel.AuthUser{}, nil
+func (routeTestAuthRepository) GetByEmail(ctx context.Context, email string) (models.AuthUser, error) {
+	return models.AuthUser{}, nil
 }
 
 func TestAuthLoginRouteIsPublicWhenJWTEnabled(t *testing.T) {
@@ -27,7 +27,7 @@ func TestAuthLoginRouteIsPublicWhenJWTEnabled(t *testing.T) {
 
 	router := NewRouter(RouterDeps{
 		Config:      cfg,
-		AuthService: authservice.NewAuthService(cfg.Auth, routeTestAuthRepository{}),
+		AuthService: services.NewAuthService(cfg.Auth, routeTestAuthRepository{}),
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader("{"))
@@ -53,7 +53,7 @@ func TestProtectedAuthRouteRequiresJWT(t *testing.T) {
 
 	router := NewRouter(RouterDeps{
 		Config:      cfg,
-		AuthService: authservice.NewAuthService(cfg.Auth, routeTestAuthRepository{}),
+		AuthService: services.NewAuthService(cfg.Auth, routeTestAuthRepository{}),
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)

@@ -1,4 +1,4 @@
-package user
+package services
 
 import (
 	"encoding/base64"
@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	usermodel "github.com/example/gin-api-scaffold/internal/models/user"
+	"github.com/example/gin-api-scaffold/internal/models"
 )
 
 type usersListCursorPayload struct {
@@ -14,7 +14,7 @@ type usersListCursorPayload struct {
 	ID        string    `json:"id"`
 }
 
-func encodeUsersListCursor(user usermodel.User) string {
+func encodeUsersListCursor(user models.User) string {
 	payload := usersListCursorPayload{
 		CreatedAt: user.CreatedAt.UTC(),
 		ID:        user.ID,
@@ -26,7 +26,7 @@ func encodeUsersListCursor(user usermodel.User) string {
 	return base64.RawURLEncoding.EncodeToString(data)
 }
 
-func decodeUsersListCursor(raw string) (*usermodel.ListUsersCursor, error) {
+func decodeUsersListCursor(raw string) (*models.ListUsersCursor, error) {
 	data, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func decodeUsersListCursor(raw string) (*usermodel.ListUsersCursor, error) {
 		return nil, errors.New("cursor is missing required fields")
 	}
 
-	return &usermodel.ListUsersCursor{
+	return &models.ListUsersCursor{
 		CreatedAt: payload.CreatedAt.UTC(),
 		ID:        payload.ID,
 	}, nil

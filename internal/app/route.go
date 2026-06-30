@@ -9,12 +9,9 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
-	authcontroller "github.com/example/gin-api-scaffold/internal/controllers/auth"
-	"github.com/example/gin-api-scaffold/internal/controllers/home"
-	usercontroller "github.com/example/gin-api-scaffold/internal/controllers/user"
+	"github.com/example/gin-api-scaffold/internal/controllers"
 	"github.com/example/gin-api-scaffold/internal/middleware"
-	authservice "github.com/example/gin-api-scaffold/internal/services/auth"
-	userservice "github.com/example/gin-api-scaffold/internal/services/user"
+	"github.com/example/gin-api-scaffold/internal/services"
 	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
@@ -22,14 +19,14 @@ type RouterDeps struct {
 	Config        config.Config
 	Logger        *slog.Logger
 	Database      Pinger
-	UsersService  *userservice.UsersService
-	AuthService   *authservice.AuthService
+	UsersService  *services.UsersService
+	AuthService   *services.AuthService
 	ReadinessName string
 }
 
 type RouteDeps struct {
-	UsersService *userservice.UsersService
-	AuthService  *authservice.AuthService
+	UsersService *services.UsersService
+	AuthService  *services.AuthService
 }
 
 type Pinger interface {
@@ -55,7 +52,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	router.Use(middleware.CORS(deps.Config.CORS))
 	router.Use(middleware.BodySizeLimit(deps.Config.HTTP.MaxBodyBytes))
 
-	readinessChecks := map[string]home.ReadinessCheck{}
+	readinessChecks := map[string]controllers.ReadinessCheck{}
 	if deps.Database != nil {
 		name := deps.ReadinessName
 		if name == "" {
@@ -63,7 +60,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		}
 		readinessChecks[name] = deps.Database.Ping
 	}
-	health := home.NewHealth(readinessChecks)
+	health := controllers.NewHealth(readinessChecks)
 	router.GET("/healthz", health.Liveness)
 	router.GET("/readyz", health.Readiness)
 
@@ -103,28 +100,28 @@ func RegisterRoutes(router *gin.RouterGroup, deps RouteDeps) {
 	}
 }
 
-func registerPublicAuthRoutes(router *gin.RouterGroup, authService *authservice.AuthService) {
-	authHandler := authcontroller.NewAuthHandler(authService)
+func registerPublicAuthRoutes(router *gin.RouterGroup, authService *services.AuthService) {
+	authHandler := controllers.NewAuthHandler(authService)
 
 	auth := router.Group("/auth")
 	auth.POST("/login", authHandler.Login)
 }
 
-func registerProtectedAuthRoutes(router *gin.RouterGroup, authService *authservice.AuthService) {
-	authHandler := authcontroller.NewAuthHandler(authService)
+func registerProtectedAuthRoutes(router *gin.RouterGroup, authService *services.AuthService) {
+	authHandler := controllers.NewAuthHandler(authService)
 
 	auth := router.Group("/auth")
 	auth.POST("/logout", authHandler.Logout)
 	auth.GET("/me", authHandler.Me)
 }
 
-func registerUserRoutes(router *gin.RouterGroup, usersService *userservice.UsersService) {
-	usersHandler := usercontroller.NewUsersHandler(usersService)
+func registerUserRoutes(router *gin.RouterGroup, usersService *services.UsersService) {
+	usersHandler := controllers.NewUsersHandler(usersService)
 
 	users := router.Group("/users")
 	users.GET("", middleware.CursorPagination(middleware.CursorPaginationConfig{
-		DefaultLimit: userservice.DefaultUsersListLimit,
-		MaxLimit:     userservice.MaxUsersListLimit,
+		DefaultLimit: services.DefaultUsersListLimit,
+		MaxLimit:     services.MaxUsersListLimit,
 	}), usersHandler.List)
 	users.POST("", usersHandler.Create)
 	users.GET("/stats", usersHandler.Stats)

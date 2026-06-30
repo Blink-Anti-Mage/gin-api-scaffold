@@ -1,4 +1,4 @@
-package user
+package services
 
 import (
 	"context"
@@ -7,37 +7,37 @@ import (
 	"time"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
-	usermodel "github.com/example/gin-api-scaffold/internal/models/user"
+	"github.com/example/gin-api-scaffold/internal/models"
 )
 
 type recordingUsersRepository struct {
-	list   func(context.Context, usermodel.ListUsersFilter) (usermodel.UserList, error)
-	create func(context.Context, usermodel.User) (usermodel.User, error)
-	update func(context.Context, usermodel.User) (usermodel.User, error)
+	list   func(context.Context, models.ListUsersFilter) (models.UserList, error)
+	create func(context.Context, models.User) (models.User, error)
+	update func(context.Context, models.User) (models.User, error)
 	delete func(context.Context, string) error
 }
 
-func (r *recordingUsersRepository) List(ctx context.Context, filter usermodel.ListUsersFilter) (usermodel.UserList, error) {
+func (r *recordingUsersRepository) List(ctx context.Context, filter models.ListUsersFilter) (models.UserList, error) {
 	if r.list == nil {
-		return usermodel.UserList{}, nil
+		return models.UserList{}, nil
 	}
 	return r.list(ctx, filter)
 }
 
-func (r *recordingUsersRepository) Get(context.Context, string) (usermodel.User, error) {
-	return usermodel.User{}, nil
+func (r *recordingUsersRepository) Get(context.Context, string) (models.User, error) {
+	return models.User{}, nil
 }
 
-func (r *recordingUsersRepository) Create(ctx context.Context, user usermodel.User) (usermodel.User, error) {
+func (r *recordingUsersRepository) Create(ctx context.Context, user models.User) (models.User, error) {
 	if r.create == nil {
-		return usermodel.User{}, nil
+		return models.User{}, nil
 	}
 	return r.create(ctx, user)
 }
 
-func (r *recordingUsersRepository) Update(ctx context.Context, user usermodel.User) (usermodel.User, error) {
+func (r *recordingUsersRepository) Update(ctx context.Context, user models.User) (models.User, error) {
 	if r.update == nil {
-		return usermodel.User{}, nil
+		return models.User{}, nil
 	}
 	return r.update(ctx, user)
 }
@@ -49,20 +49,20 @@ func (r *recordingUsersRepository) Delete(ctx context.Context, id string) error 
 	return r.delete(ctx, id)
 }
 
-func (r *recordingUsersRepository) Stats(context.Context) (usermodel.UserStats, error) {
-	return usermodel.UserStats{}, nil
+func (r *recordingUsersRepository) Stats(context.Context) (models.UserStats, error) {
+	return models.UserStats{}, nil
 }
 
 func TestUsersServiceListUsesCursorPagination(t *testing.T) {
 	firstCreatedAt := time.Date(2026, 6, 28, 10, 0, 0, 0, time.UTC)
-	cursorUser := usermodel.User{ID: "user-001", CreatedAt: firstCreatedAt}
-	var captured usermodel.ListUsersFilter
+	cursorUser := models.User{ID: "user-001", CreatedAt: firstCreatedAt}
+	var captured models.ListUsersFilter
 
 	repo := &recordingUsersRepository{
-		list: func(_ context.Context, filter usermodel.ListUsersFilter) (usermodel.UserList, error) {
+		list: func(_ context.Context, filter models.ListUsersFilter) (models.UserList, error) {
 			captured = filter
-			return usermodel.UserList{
-				Items: []usermodel.User{
+			return models.UserList{
+				Items: []models.User{
 					{ID: "user-002", CreatedAt: firstCreatedAt.Add(time.Minute)},
 					{ID: "user-003", CreatedAt: firstCreatedAt.Add(2 * time.Minute)},
 					{ID: "user-004", CreatedAt: firstCreatedAt.Add(3 * time.Minute)},
@@ -72,7 +72,7 @@ func TestUsersServiceListUsesCursorPagination(t *testing.T) {
 		},
 	}
 
-	users, err := NewUsersService(repo).List(context.Background(), usermodel.ListUsersFilter{
+	users, err := NewUsersService(repo).List(context.Background(), models.ListUsersFilter{
 		Search: " ada ",
 		Limit:  2,
 		Cursor: encodeUsersListCursor(cursorUser),
@@ -116,13 +116,13 @@ func TestUsersServiceListUsesCursorPagination(t *testing.T) {
 
 func TestUsersServiceListRejectsInvalidCursor(t *testing.T) {
 	repo := &recordingUsersRepository{
-		list: func(context.Context, usermodel.ListUsersFilter) (usermodel.UserList, error) {
+		list: func(context.Context, models.ListUsersFilter) (models.UserList, error) {
 			t.Fatal("repository should not be called for invalid cursor")
-			return usermodel.UserList{}, nil
+			return models.UserList{}, nil
 		},
 	}
 
-	_, err := NewUsersService(repo).List(context.Background(), usermodel.ListUsersFilter{Cursor: "not-a-cursor"})
+	_, err := NewUsersService(repo).List(context.Background(), models.ListUsersFilter{Cursor: "not-a-cursor"})
 	if err == nil {
 		t.Fatal("expected invalid cursor error")
 	}
@@ -134,15 +134,15 @@ func TestUsersServiceListRejectsInvalidCursor(t *testing.T) {
 }
 
 func TestUsersServiceCreateNormalizesInput(t *testing.T) {
-	var captured usermodel.User
+	var captured models.User
 	repo := &recordingUsersRepository{
-		create: func(_ context.Context, user usermodel.User) (usermodel.User, error) {
+		create: func(_ context.Context, user models.User) (models.User, error) {
 			captured = user
 			return user, nil
 		},
 	}
 
-	user, err := NewUsersService(repo).Create(context.Background(), usermodel.CreateUserInput{
+	user, err := NewUsersService(repo).Create(context.Background(), models.CreateUserInput{
 		Name:     " Ada Byron ",
 		Email:    " ADA@EXAMPLE.COM ",
 		Password: "valid-password",
@@ -168,31 +168,31 @@ func TestUsersServiceCreateNormalizesInput(t *testing.T) {
 func TestUsersServiceCreateValidatesInput(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       usermodel.CreateUserInput
+		input       models.CreateUserInput
 		expected    string
 		expectedMsg string
 	}{
 		{
 			name:        "empty name",
-			input:       usermodel.CreateUserInput{Name: "   ", Email: "ada@example.com", Password: "valid-password"},
+			input:       models.CreateUserInput{Name: "   ", Email: "ada@example.com", Password: "valid-password"},
 			expected:    "invalid_name",
 			expectedMsg: "name is required",
 		},
 		{
 			name:        "name too long",
-			input:       usermodel.CreateUserInput{Name: strings.Repeat("a", maxUserNameLength+1), Email: "ada@example.com", Password: "valid-password"},
+			input:       models.CreateUserInput{Name: strings.Repeat("a", maxUserNameLength+1), Email: "ada@example.com", Password: "valid-password"},
 			expected:    "invalid_name",
 			expectedMsg: "name too long",
 		},
 		{
 			name:        "invalid email",
-			input:       usermodel.CreateUserInput{Name: "Ada Byron", Email: "not-an-email", Password: "valid-password"},
+			input:       models.CreateUserInput{Name: "Ada Byron", Email: "not-an-email", Password: "valid-password"},
 			expected:    "invalid_email",
 			expectedMsg: "invalid email",
 		},
 		{
 			name:        "password too short",
-			input:       usermodel.CreateUserInput{Name: "Ada Byron", Email: "ada@example.com", Password: "short"},
+			input:       models.CreateUserInput{Name: "Ada Byron", Email: "ada@example.com", Password: "short"},
 			expected:    "invalid_password",
 			expectedMsg: "password too short",
 		},
@@ -201,9 +201,9 @@ func TestUsersServiceCreateValidatesInput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &recordingUsersRepository{
-				create: func(context.Context, usermodel.User) (usermodel.User, error) {
+				create: func(context.Context, models.User) (models.User, error) {
 					t.Fatal("repository should not be called for invalid input")
-					return usermodel.User{}, nil
+					return models.User{}, nil
 				},
 			}
 
@@ -224,15 +224,15 @@ func TestUsersServiceCreateValidatesInput(t *testing.T) {
 }
 
 func TestUsersServiceUpdateNormalizesInput(t *testing.T) {
-	var captured usermodel.User
+	var captured models.User
 	repo := &recordingUsersRepository{
-		update: func(_ context.Context, user usermodel.User) (usermodel.User, error) {
+		update: func(_ context.Context, user models.User) (models.User, error) {
 			captured = user
 			return user, nil
 		},
 	}
 
-	user, err := NewUsersService(repo).Update(context.Background(), usermodel.UpdateUserInput{
+	user, err := NewUsersService(repo).Update(context.Background(), models.UpdateUserInput{
 		ID:    " user-001 ",
 		Name:  " Ada Byron ",
 		Email: " ADA@EXAMPLE.COM ",

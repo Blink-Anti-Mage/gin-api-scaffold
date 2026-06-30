@@ -1,4 +1,4 @@
-package user
+package repository
 
 import (
 	"context"
@@ -15,8 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
-	authmodel "github.com/example/gin-api-scaffold/internal/models/auth"
-	usermodel "github.com/example/gin-api-scaffold/internal/models/user"
+	"github.com/example/gin-api-scaffold/internal/models"
 )
 
 type PostgresUsersRepository struct {
@@ -29,7 +28,7 @@ func NewPostgresUsersRepository(pool *pgxpool.Pool) *PostgresUsersRepository {
 	}
 }
 
-func (r *PostgresUsersRepository) List(ctx context.Context, filter usermodel.ListUsersFilter) (usermodel.UserList, error) {
+func (r *PostgresUsersRepository) List(ctx context.Context, filter models.ListUsersFilter) (models.UserList, error) {
 	search := strings.TrimSpace(filter.Search)
 
 	var afterCreatedAt any
@@ -49,42 +48,42 @@ WHERE (NULLIF($1, '') IS NULL
 ORDER BY created_at ASC, id ASC
 LIMIT $4`, search, afterCreatedAt, afterID, filter.Limit)
 	if err != nil {
-		return usermodel.UserList{}, err
+		return models.UserList{}, err
 	}
 	defer rows.Close()
 
-	users := make([]usermodel.User, 0)
+	users := make([]models.User, 0)
 	for rows.Next() {
-		var user usermodel.User
+		var user models.User
 		if err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt); err != nil {
-			return usermodel.UserList{}, err
+			return models.UserList{}, err
 		}
 		users = append(users, user)
 	}
 	if err := rows.Err(); err != nil {
-		return usermodel.UserList{}, err
+		return models.UserList{}, err
 	}
 
-	return usermodel.UserList{
+	return models.UserList{
 		Items: users,
 		Limit: filter.Limit,
 	}, nil
 }
 
-func (r *PostgresUsersRepository) Get(ctx context.Context, id string) (usermodel.User, error) {
-	var user usermodel.User
+func (r *PostgresUsersRepository) Get(ctx context.Context, id string) (models.User, error) {
+	var user models.User
 	err := r.pool.QueryRow(ctx, `
 SELECT id, name, email, created_at
 FROM users
 WHERE id = $1`, id).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err != nil {
-		return usermodel.User{}, mapUserPostgresError(err)
+		return models.User{}, mapUserPostgresError(err)
 	}
 
 	return user, nil
 }
 
-func (r *PostgresUsersRepository) Create(ctx context.Context, user usermodel.User) (usermodel.User, error) {
+func (r *PostgresUsersRepository) Create(ctx context.Context, user models.User) (models.User, error) {
 	if user.ID == "" {
 		user.ID = newUserID()
 	}
@@ -103,13 +102,13 @@ RETURNING id, name, email, created_at`,
 		user.CreatedAt,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err != nil {
-		return usermodel.User{}, mapUserPostgresError(err)
+		return models.User{}, mapUserPostgresError(err)
 	}
 
 	return user, nil
 }
 
-func (r *PostgresUsersRepository) Update(ctx context.Context, user usermodel.User) (usermodel.User, error) {
+func (r *PostgresUsersRepository) Update(ctx context.Context, user models.User) (models.User, error) {
 	err := r.pool.QueryRow(ctx, `
 UPDATE users
 SET name = $2,
@@ -121,7 +120,7 @@ RETURNING id, name, email, created_at`,
 		user.Email,
 	).Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
 	if err != nil {
-		return usermodel.User{}, mapUserPostgresError(err)
+		return models.User{}, mapUserPostgresError(err)
 	}
 
 	return user, nil
@@ -141,26 +140,26 @@ WHERE id = $1`, id)
 	return nil
 }
 
-func (r *PostgresUsersRepository) GetByEmail(ctx context.Context, email string) (authmodel.AuthUser, error) {
-	var user authmodel.AuthUser
+func (r *PostgresUsersRepository) GetByEmail(ctx context.Context, email string) (models.AuthUser, error) {
+	var user models.AuthUser
 	err := r.pool.QueryRow(ctx, `
 SELECT id, name, email, password_hash
 FROM users
 WHERE lower(email) = lower($1)`, email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash)
 	if err != nil {
-		return authmodel.AuthUser{}, mapUserPostgresError(err)
+		return models.AuthUser{}, mapUserPostgresError(err)
 	}
 
 	return user, nil
 }
 
-func (r *PostgresUsersRepository) Stats(ctx context.Context) (usermodel.UserStats, error) {
-	var stats usermodel.UserStats
+func (r *PostgresUsersRepository) Stats(ctx context.Context) (models.UserStats, error) {
+	var stats models.UserStats
 	var lastCreatedAt pgtype.Timestamptz
 	if err := r.pool.QueryRow(ctx, `
 SELECT count(*), max(created_at)
 FROM users`).Scan(&stats.Total, &lastCreatedAt); err != nil {
-		return usermodel.UserStats{}, err
+		return models.UserStats{}, err
 	}
 	if lastCreatedAt.Valid {
 		createdAt := lastCreatedAt.Time

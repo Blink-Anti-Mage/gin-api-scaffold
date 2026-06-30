@@ -1,4 +1,4 @@
-package user
+package controllers
 
 import (
 	"strings"
@@ -7,16 +7,16 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/middleware"
-	usermodel "github.com/example/gin-api-scaffold/internal/models/user"
-	userservice "github.com/example/gin-api-scaffold/internal/services/user"
+	"github.com/example/gin-api-scaffold/internal/models"
+	"github.com/example/gin-api-scaffold/internal/services"
 	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 type UsersHandler struct {
-	service *userservice.UsersService
+	service *services.UsersService
 }
 
-func NewUsersHandler(service *userservice.UsersService) *UsersHandler {
+func NewUsersHandler(service *services.UsersService) *UsersHandler {
 	return &UsersHandler{
 		service: service,
 	}
@@ -60,12 +60,12 @@ func (h *UsersHandler) Get(c *gin.Context) {
 }
 
 func (h *UsersHandler) Create(c *gin.Context) {
-	var req usermodel.CreateUserRequest
+	var req models.CreateUserRequest
 	if !response.BindJSON(c, &req) {
 		return
 	}
 
-	user, err := h.service.Create(c.Request.Context(), usermodel.CreateUserInput{
+	user, err := h.service.Create(c.Request.Context(), models.CreateUserInput{
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
@@ -85,12 +85,12 @@ func (h *UsersHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var req usermodel.UpdateUserRequest
+	var req models.UpdateUserRequest
 	if !response.BindJSON(c, &req) {
 		return
 	}
 
-	user, err := h.service.Update(c.Request.Context(), usermodel.UpdateUserInput{
+	user, err := h.service.Update(c.Request.Context(), models.UpdateUserInput{
 		ID:    id,
 		Name:  req.Name,
 		Email: req.Email,
@@ -118,10 +118,10 @@ func (h *UsersHandler) Delete(c *gin.Context) {
 	response.NoContent(c)
 }
 
-func listUsersFilter(c *gin.Context) usermodel.ListUsersFilter {
+func listUsersFilter(c *gin.Context) models.ListUsersFilter {
 	pagination, _ := middleware.CurrentCursorPagination(c)
 
-	return usermodel.ListUsersFilter{
+	return models.ListUsersFilter{
 		Search: strings.TrimSpace(c.Query("search")),
 		Limit:  pagination.Limit,
 		Cursor: pagination.Cursor,

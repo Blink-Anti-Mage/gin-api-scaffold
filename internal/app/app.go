@@ -7,10 +7,8 @@ import (
 	"net/http"
 
 	"github.com/example/gin-api-scaffold/internal/config"
-	"github.com/example/gin-api-scaffold/internal/repository/db"
-	userrepo "github.com/example/gin-api-scaffold/internal/repository/user"
-	authservice "github.com/example/gin-api-scaffold/internal/services/auth"
-	userservice "github.com/example/gin-api-scaffold/internal/services/user"
+	"github.com/example/gin-api-scaffold/internal/repository"
+	"github.com/example/gin-api-scaffold/internal/services"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,8 +30,8 @@ func New(cfg config.Config, logger *slog.Logger) (*App, error) {
 		return nil, err
 	}
 
-	usersService := userservice.NewUsersService(repos.Users)
-	authService := authservice.NewAuthService(cfg.Auth, repos.Auth)
+	usersService := services.NewUsersService(repos.Users)
+	authService := services.NewAuthService(cfg.Auth, repos.Auth)
 	router := NewRouter(RouterDeps{
 		Config:        cfg,
 		Logger:        logger,
@@ -89,18 +87,18 @@ func (a *App) Run(ctx context.Context) error {
 	}
 }
 
-func buildRepositories(cfg config.Config, logger *slog.Logger) (userrepo.Repositories, *pgxpool.Pool, error) {
+func buildRepositories(cfg config.Config, logger *slog.Logger) (repository.Repositories, *pgxpool.Pool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Database.ConnectTimeout)
 	defer cancel()
 
-	pool, err := db.OpenPostgres(ctx, cfg.Database)
+	pool, err := repository.OpenPostgres(ctx, cfg.Database)
 	if err != nil {
-		return userrepo.Repositories{}, nil, err
+		return repository.Repositories{}, nil, err
 	}
 	logger.Info("postgres_connected")
 
-	usersRepo := userrepo.NewPostgresUsersRepository(pool)
-	return userrepo.Repositories{
+	usersRepo := repository.NewPostgresUsersRepository(pool)
+	return repository.Repositories{
 		Users: usersRepo,
 		Auth:  usersRepo,
 	}, pool, nil

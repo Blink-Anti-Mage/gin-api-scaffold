@@ -1,4 +1,4 @@
-package user
+package repository
 
 type Repositories struct {
 	Users *PostgresUsersRepository

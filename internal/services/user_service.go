@@ -1,4 +1,4 @@
-package user
+package services
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
-	usermodel "github.com/example/gin-api-scaffold/internal/models/user"
+	"github.com/example/gin-api-scaffold/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -21,12 +21,12 @@ const (
 )
 
 type UsersRepository interface {
-	List(ctx context.Context, filter usermodel.ListUsersFilter) (usermodel.UserList, error)
-	Get(ctx context.Context, id string) (usermodel.User, error)
-	Create(ctx context.Context, user usermodel.User) (usermodel.User, error)
-	Update(ctx context.Context, user usermodel.User) (usermodel.User, error)
+	List(ctx context.Context, filter models.ListUsersFilter) (models.UserList, error)
+	Get(ctx context.Context, id string) (models.User, error)
+	Create(ctx context.Context, user models.User) (models.User, error)
+	Update(ctx context.Context, user models.User) (models.User, error)
 	Delete(ctx context.Context, id string) error
-	Stats(ctx context.Context) (usermodel.UserStats, error)
+	Stats(ctx context.Context) (models.UserStats, error)
 }
 
 type UsersService struct {
@@ -39,7 +39,7 @@ func NewUsersService(repo UsersRepository) *UsersService {
 	}
 }
 
-func (s *UsersService) List(ctx context.Context, filter usermodel.ListUsersFilter) (usermodel.UserList, error) {
+func (s *UsersService) List(ctx context.Context, filter models.ListUsersFilter) (models.UserList, error) {
 	filter.Search = strings.TrimSpace(filter.Search)
 	filter.Cursor = strings.TrimSpace(filter.Cursor)
 	if filter.Limit <= 0 {
@@ -53,7 +53,7 @@ func (s *UsersService) List(ctx context.Context, filter usermodel.ListUsersFilte
 	if filter.Cursor != "" {
 		cursor, err := decodeUsersListCursor(filter.Cursor)
 		if err != nil {
-			return usermodel.UserList{}, apperr.BadRequest("invalid_cursor", "cursor is invalid")
+			return models.UserList{}, apperr.BadRequest("invalid_cursor", "cursor is invalid")
 		}
 		filter.After = cursor
 	}
@@ -61,7 +61,7 @@ func (s *UsersService) List(ctx context.Context, filter usermodel.ListUsersFilte
 	filter.Limit = limit + 1
 	users, err := s.repo.List(ctx, filter)
 	if err != nil {
-		return usermodel.UserList{}, err
+		return models.UserList{}, err
 	}
 
 	users.Limit = limit
@@ -73,29 +73,29 @@ func (s *UsersService) List(ctx context.Context, filter usermodel.ListUsersFilte
 	return users, nil
 }
 
-func (s *UsersService) Get(ctx context.Context, id string) (usermodel.User, error) {
+func (s *UsersService) Get(ctx context.Context, id string) (models.User, error) {
 	return s.repo.Get(ctx, id)
 }
 
-func (s *UsersService) Create(ctx context.Context, input usermodel.CreateUserInput) (usermodel.User, error) {
+func (s *UsersService) Create(ctx context.Context, input models.CreateUserInput) (models.User, error) {
 	user, err := normalizedUser(input.Name, input.Email)
 	if err != nil {
-		return usermodel.User{}, err
+		return models.User{}, err
 	}
 
 	passwordHash, err := hashPassword(input.Password)
 	if err != nil {
-		return usermodel.User{}, err
+		return models.User{}, err
 	}
 	user.PasswordHash = passwordHash
 
 	return s.repo.Create(ctx, user)
 }
 
-func (s *UsersService) Update(ctx context.Context, input usermodel.UpdateUserInput) (usermodel.User, error) {
+func (s *UsersService) Update(ctx context.Context, input models.UpdateUserInput) (models.User, error) {
 	user, err := normalizedUser(input.Name, input.Email)
 	if err != nil {
-		return usermodel.User{}, err
+		return models.User{}, err
 	}
 	user.ID = strings.TrimSpace(input.ID)
 
@@ -106,25 +106,25 @@ func (s *UsersService) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, strings.TrimSpace(id))
 }
 
-func (s *UsersService) Stats(ctx context.Context) (usermodel.UserStats, error) {
+func (s *UsersService) Stats(ctx context.Context) (models.UserStats, error) {
 	return s.repo.Stats(ctx)
 }
 
-func normalizedUser(name string, email string) (usermodel.User, error) {
+func normalizedUser(name string, email string) (models.User, error) {
 	name = strings.TrimSpace(name)
 	email = strings.ToLower(strings.TrimSpace(email))
 
 	if name == "" {
-		return usermodel.User{}, apperr.BadRequest("invalid_name", "name is required")
+		return models.User{}, apperr.BadRequest("invalid_name", "name is required")
 	}
 	if utf8.RuneCountInString(name) > maxUserNameLength {
-		return usermodel.User{}, apperr.BadRequest("invalid_name", "name too long")
+		return models.User{}, apperr.BadRequest("invalid_name", "name too long")
 	}
 	if !validEmail(email) {
-		return usermodel.User{}, apperr.BadRequest("invalid_email", "invalid email")
+		return models.User{}, apperr.BadRequest("invalid_email", "invalid email")
 	}
 
-	return usermodel.User{
+	return models.User{
 		Name:  name,
 		Email: email,
 	}, nil

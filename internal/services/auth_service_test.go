@@ -1,4 +1,4 @@
-package auth
+package services
 
 import (
 	"context"
@@ -10,16 +10,16 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
-	authmodel "github.com/example/gin-api-scaffold/internal/models/auth"
+	"github.com/example/gin-api-scaffold/internal/models"
 )
 
 type recordingAuthRepository struct {
-	getByEmail func(context.Context, string) (authmodel.AuthUser, error)
+	getByEmail func(context.Context, string) (models.AuthUser, error)
 }
 
-func (r *recordingAuthRepository) GetByEmail(ctx context.Context, email string) (authmodel.AuthUser, error) {
+func (r *recordingAuthRepository) GetByEmail(ctx context.Context, email string) (models.AuthUser, error) {
 	if r.getByEmail == nil {
-		return authmodel.AuthUser{}, nil
+		return models.AuthUser{}, nil
 	}
 	return r.getByEmail(ctx, email)
 }
@@ -29,9 +29,9 @@ func TestAuthServiceLoginSignsJWTForUserPassword(t *testing.T) {
 
 	var capturedEmail string
 	repo := &recordingAuthRepository{
-		getByEmail: func(_ context.Context, email string) (authmodel.AuthUser, error) {
+		getByEmail: func(_ context.Context, email string) (models.AuthUser, error) {
 			capturedEmail = email
-			return authmodel.AuthUser{
+			return models.AuthUser{
 				ID:           "user-001",
 				Name:         "Ada Byron",
 				Email:        "ada@example.com",
@@ -50,7 +50,7 @@ func TestAuthServiceLoginSignsJWTForUserPassword(t *testing.T) {
 		return time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	}
 
-	resp, err := auth.Login(context.Background(), authmodel.LoginInput{
+	resp, err := auth.Login(context.Background(), models.LoginInput{
 		Email:    " ADA@EXAMPLE.COM ",
 		Password: "valid-password",
 	})
@@ -100,8 +100,8 @@ func TestAuthServiceLoginRejectsInvalidPassword(t *testing.T) {
 		Enabled: true,
 		Secret:  "test-secret-for-example-auth-service-32-bytes",
 	}, &recordingAuthRepository{
-		getByEmail: func(context.Context, string) (authmodel.AuthUser, error) {
-			return authmodel.AuthUser{
+		getByEmail: func(context.Context, string) (models.AuthUser, error) {
+			return models.AuthUser{
 				ID:           "user-001",
 				Email:        "ada@example.com",
 				PasswordHash: passwordHash,
@@ -109,7 +109,7 @@ func TestAuthServiceLoginRejectsInvalidPassword(t *testing.T) {
 		},
 	})
 
-	_, err := auth.Login(context.Background(), authmodel.LoginInput{
+	_, err := auth.Login(context.Background(), models.LoginInput{
 		Email:    "ada@example.com",
 		Password: "wrong-password",
 	})
@@ -140,7 +140,7 @@ func TestAuthServiceLogoutRevokesTokenID(t *testing.T) {
 		return now
 	}
 
-	input := authmodel.LogoutInput{
+	input := models.LogoutInput{
 		JWTID:     "token-001",
 		ExpiresAt: now.Add(time.Hour),
 	}

@@ -1,4 +1,4 @@
-package auth
+package controllers
 
 import (
 	"net/http"
@@ -7,28 +7,28 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/middleware"
-	authmodel "github.com/example/gin-api-scaffold/internal/models/auth"
-	authservice "github.com/example/gin-api-scaffold/internal/services/auth"
+	"github.com/example/gin-api-scaffold/internal/models"
+	"github.com/example/gin-api-scaffold/internal/services"
 	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 type AuthHandler struct {
-	service *authservice.AuthService
+	service *services.AuthService
 }
 
-func NewAuthHandler(service *authservice.AuthService) *AuthHandler {
+func NewAuthHandler(service *services.AuthService) *AuthHandler {
 	return &AuthHandler{
 		service: service,
 	}
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
-	var req authmodel.LoginRequest
+	var req models.LoginRequest
 	if !response.BindJSON(c, &req) {
 		return
 	}
 
-	token, err := h.service.Login(c.Request.Context(), authmodel.LoginInput{
+	token, err := h.service.Login(c.Request.Context(), models.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
 	})
@@ -47,7 +47,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.Logout(c.Request.Context(), authmodel.LogoutInput{
+	if err := h.service.Logout(c.Request.Context(), models.LogoutInput{
 		JWTID:     claims.JWTID,
 		ExpiresAt: claims.ExpiresAt,
 	}); err != nil {
@@ -65,7 +65,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, authmodel.CurrentUserResponse{
+	response.OK(c, models.CurrentUserResponse{
 		Subject:   claims.Subject,
 		Email:     stringClaim(claims.Raw, "email"),
 		Name:      stringClaim(claims.Raw, "name"),

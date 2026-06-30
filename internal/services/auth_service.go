@@ -1,22 +1,20 @@
-package auth
+package services
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
-	"net/mail"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
-	authmodel "github.com/example/gin-api-scaffold/internal/models/auth"
+	"github.com/example/gin-api-scaffold/internal/models"
 )
 
 const (
@@ -27,7 +25,7 @@ var defaultAuthScopes = []string{"users:read", "users:write"}
 var defaultAuthRoles = []string{"admin"}
 
 type AuthRepository interface {
-	GetByEmail(ctx context.Context, email string) (authmodel.AuthUser, error)
+	GetByEmail(ctx context.Context, email string) (models.AuthUser, error)
 }
 
 type AuthService struct {
@@ -48,31 +46,31 @@ func NewAuthService(cfg config.AuthConfig, repo AuthRepository) *AuthService {
 	}
 }
 
-func (s *AuthService) Login(ctx context.Context, input authmodel.LoginInput) (authmodel.LoginResponse, error) {
+func (s *AuthService) Login(ctx context.Context, input models.LoginInput) (models.LoginResponse, error) {
 	if !s.cfg.Enabled {
-		return authmodel.LoginResponse{}, apperr.BadRequest("auth_disabled", "auth is disabled")
+		return models.LoginResponse{}, apperr.BadRequest("auth_disabled", "auth is disabled")
 	}
 	if strings.TrimSpace(s.cfg.Secret) == "" {
-		return authmodel.LoginResponse{}, apperr.New(http.StatusServiceUnavailable, "auth_unavailable", "auth is unavailable")
+		return models.LoginResponse{}, apperr.New(http.StatusServiceUnavailable, "auth_unavailable", "auth is unavailable")
 	}
 	if s.repo == nil {
-		return authmodel.LoginResponse{}, apperr.New(http.StatusServiceUnavailable, "auth_unavailable", "auth is unavailable")
+		return models.LoginResponse{}, apperr.New(http.StatusServiceUnavailable, "auth_unavailable", "auth is unavailable")
 	}
 
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if !validEmail(email) || input.Password == "" {
-		return authmodel.LoginResponse{}, apperr.New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return models.LoginResponse{}, apperr.New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 	}
 
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		if isNotFound(err) {
-			return authmodel.LoginResponse{}, apperr.New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+			return models.LoginResponse{}, apperr.New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		}
-		return authmodel.LoginResponse{}, err
+		return models.LoginResponse{}, err
 	}
 	if !passwordMatches(user.PasswordHash, input.Password) {
-		return authmodel.LoginResponse{}, apperr.New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return models.LoginResponse{}, apperr.New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 	}
 
 	now := s.now().UTC()
@@ -82,10 +80,10 @@ func (s *AuthService) Login(ctx context.Context, input authmodel.LoginInput) (au
 
 	accessToken, err := s.signAccessToken(user, now, expiresAt, roles, scopes)
 	if err != nil {
-		return authmodel.LoginResponse{}, err
+		return models.LoginResponse{}, err
 	}
 
-	return authmodel.LoginResponse{
+	return models.LoginResponse{
 		AccessToken: accessToken,
 		TokenType:   "Bearer",
 		ExpiresIn:   int64(defaultAccessTokenTTL / time.Second),
@@ -96,7 +94,7 @@ func (s *AuthService) Login(ctx context.Context, input authmodel.LoginInput) (au
 	}, nil
 }
 
-func (s *AuthService) Logout(ctx context.Context, input authmodel.LogoutInput) error {
+func (s *AuthService) Logout(ctx context.Context, input models.LogoutInput) error {
 	_ = ctx
 
 	if input.JWTID == "" {
@@ -141,7 +139,7 @@ func (s *AuthService) IsRevoked(jwtID string) bool {
 	return true
 }
 
-func (s *AuthService) signAccessToken(user authmodel.AuthUser, now time.Time, expiresAt time.Time, roles []string, scopes []string) (string, error) {
+func (s *AuthService) signAccessToken(user models.AuthUser, now time.Time, expiresAt time.Time, roles []string, scopes []string) (string, error) {
 	jti, err := newAuthTokenID()
 	if err != nil {
 		return "", apperr.Internal(err)
@@ -187,19 +185,6 @@ func newAuthTokenID() (string, error) {
 		return hex.EncodeToString(b[:]), nil
 	}
 	return strconv.FormatInt(time.Now().UnixNano(), 36), nil
-}
-
-func validEmail(email string) bool {
-	if email == "" || len(email) > 255 || strings.ContainsAny(email, " \t\r\n") {
-		return false
-	}
-
-	address, err := mail.ParseAddress(email)
-	return err == nil && address.Address == email
-}
-
-func passwordMatches(passwordHash string, password string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) == nil
 }
 
 func isNotFound(err error) bool {
