@@ -13,7 +13,7 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
-	"github.com/example/gin-api-scaffold/internal/httpx"
+	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 const (
@@ -45,7 +45,7 @@ type jwtTokenClaims struct {
 type jwtTokenClaimsAlias jwtTokenClaims
 
 type TokenRevocationChecker interface {
-	IsRevoked(claims JWTClaims) bool
+	IsRevoked(jwtID string) bool
 }
 
 func (c *jwtTokenClaims) UnmarshalJSON(data []byte) error {
@@ -92,7 +92,7 @@ func RejectRevokedJWT(checker TokenRevocationChecker) gin.HandlerFunc {
 		}
 
 		claims, ok := CurrentJWTClaims(c)
-		if ok && checker.IsRevoked(claims) {
+		if ok && checker.IsRevoked(claims.JWTID) {
 			unauthorized(c, "revoked_token", "token has been revoked")
 			return
 		}
@@ -224,5 +224,5 @@ func normalizedScopes(scopes []string, scope string) []string {
 
 func unauthorized(c *gin.Context, code string, message string) {
 	c.Header("WWW-Authenticate", `Bearer realm="api"`)
-	httpx.Error(c, apperr.New(http.StatusUnauthorized, code, message))
+	response.Error(c, apperr.New(http.StatusUnauthorized, code, message))
 }

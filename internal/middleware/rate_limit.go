@@ -10,7 +10,7 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
-	"github.com/example/gin-api-scaffold/internal/httpx"
+	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 type rateLimiter struct {
@@ -52,7 +52,7 @@ func (l *rateLimiter) handle(c *gin.Context) {
 
 	if !allowed {
 		c.Header("Retry-After", strconv.FormatInt(secondsUntil(resetAt, now), 10))
-		httpx.Error(c, apperr.TooManyRequests())
+		response.Error(c, apperr.TooManyRequests())
 		return
 	}
 

@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
-	"github.com/example/gin-api-scaffold/internal/httpx"
+	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 const CursorPaginationKey = "cursor_pagination"
@@ -72,7 +72,7 @@ func cursorPaginationLimit(c *gin.Context, defaultLimit int) (int, bool) {
 
 	limit, err := strconv.Atoi(raw)
 	if err != nil {
-		httpx.Error(c, apperr.BadRequest("invalid_query", "limit must be an integer"))
+		response.Error(c, apperr.BadRequest("invalid_query", "limit must be an integer"))
 		return 0, false
 	}
 	if limit <= 0 {

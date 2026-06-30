@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
-	"github.com/example/gin-api-scaffold/internal/httpx"
+	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 func BodySizeLimit(maxBytes int64) gin.HandlerFunc {
@@ -17,7 +17,7 @@ func BodySizeLimit(maxBytes int64) gin.HandlerFunc {
 		}
 
 		if c.Request.ContentLength > maxBytes {
-			httpx.Error(c, apperr.PayloadTooLarge())
+			response.Error(c, apperr.PayloadTooLarge())
 			return
 		}
 

@@ -151,8 +151,8 @@ func TestRejectRevokedJWTRejectsRevokedToken(t *testing.T) {
 
 type revokedJWTChecker struct{}
 
-func (revokedJWTChecker) IsRevoked(claims JWTClaims) bool {
-	return claims.JWTID == "revoked-token"
+func (revokedJWTChecker) IsRevoked(jwtID string) bool {
+	return jwtID == "revoked-token"
 }
 
 func signTestJWT(t *testing.T, secret string, payload map[string]any) string {

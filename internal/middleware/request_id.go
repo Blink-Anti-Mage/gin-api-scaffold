@@ -8,20 +8,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/example/gin-api-scaffold/internal/httpx"
+	"github.com/example/gin-api-scaffold/pkg/response"
 )
 
 const RequestIDKey = "request_id"
 
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		requestID := c.GetHeader(httpx.RequestIDHeader)
+		requestID := c.GetHeader(response.RequestIDHeader)
 		if requestID == "" {
 			requestID = newRequestID()
 		}
 
 		c.Set(RequestIDKey, requestID)
-		c.Writer.Header().Set(httpx.RequestIDHeader, requestID)
+		c.Writer.Header().Set(response.RequestIDHeader, requestID)
 		c.Next()
 	}
 }
