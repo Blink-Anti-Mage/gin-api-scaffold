@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gin API Console</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f7f2;
+      --ink: #17201b;
+      --muted: #657068;
+      --line: #d9ded5;
+      --panel: #ffffff;
+      --panel-2: #eef2ea;
+      --coal: #101713;
+      --ok: #197a4a;
+      --warn: #b45a1b;
+      --bad: #b73532;
+      --blue: #2459b3;
+      --mint: #d7f4df;
+      --amber: #ffe2b6;
+      --rose: #f7d4d2;
+      --shadow: 0 18px 50px rgba(25, 34, 28, 0.12);
+      --radius: 8px;
+      --mono: "Cascadia Mono", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: "IBM Plex Sans", Aptos, "Segoe UI", sans-serif;
+      --display: Cambria, Georgia, serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        linear-gradient(90deg, rgba(23, 32, 27, 0.035) 1px, transparent 1px) 0 0 / 42px 42px,
+        linear-gradient(180deg, rgba(23, 32, 27, 0.035) 1px, transparent 1px) 0 0 / 42px 42px,
+        radial-gradient(circle at 14% 0%, rgba(25, 122, 74, 0.13), transparent 34rem),
+        radial-gradient(circle at 92% 12%, rgba(180, 90, 27, 0.13), transparent 30rem),
+        var(--paper);
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(238, 242, 234, 0.94)),
+        var(--panel-2);
+      box-shadow: 10px 0 40px rgba(21, 29, 24, 0.08);
+    }
+
+    .brand {
+      padding: 22px 18px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand-mark {
+      display: inline-grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      margin-bottom: 12px;
+      color: var(--paper);
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 800;
+      background: var(--coal);
+      border: 2px solid #27372d;
+      border-radius: 6px;
+      box-shadow: 5px 5px 0 #b9c5b6;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: 34px;
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .origin-warning {
+      display: none;
+      margin: 14px 0 0;
+      padding: 10px 11px;
+      color: #684118;
+      background: var(--amber);
+      border: 1px solid #e0bb81;
+      border-radius: 7px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .origin-warning.show {
+      display: block;
+    }
+
+    .search-box {
+      padding: 14px 14px 10px;
+    }
+
+    .search-box input,
+    .topbar input,
+    .token-row input,
+    .field input,
+    .headers-box textarea,
+    .body-box textarea {
+      width: 100%;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      outline: none;
+      transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+    }
+
+    .search-box input,
+    .topbar input,
+    .token-row input,
+    .field input {
+      height: 38px;
+      padding: 0 11px;
+    }
+
+    textarea {
+      min-height: 150px;
+      padding: 12px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: #83a58f;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(25, 122, 74, 0.14);
+    }
+
+    .endpoint-list {
+      overflow: auto;
+      padding: 2px 10px 18px;
+    }
+
+    .group-title {
+      margin: 14px 8px 7px;
+      color: #56625a;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .endpoint {
+      display: grid;
+      grid-template-columns: 62px minmax(0, 1fr);
+      gap: 10px;
+      width: 100%;
+      margin: 0 0 7px;
+      padding: 10px 10px;
+      text-align: left;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      position: relative;
+    }
+
+    .endpoint:hover {
+      background: rgba(255, 255, 255, 0.72);
+      border-color: var(--line);
+    }
+
+    .endpoint.active {
+      background: #fff;
+      border-color: #a5b6a5;
+      box-shadow: 4px 4px 0 #d6ded3;
+    }
+
+    .method {
+      align-self: start;
+      display: inline-grid;
+      place-items: center;
+      min-width: 52px;
+      height: 28px;
+      padding: 0 8px;
+      border-radius: 5px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+      border: 1px solid currentColor;
+    }
+
+    .method.get {
+      color: var(--blue);
+      background: #dbe8ff;
+    }
+
+    .method.post {
+      color: var(--ok);
+      background: var(--mint);
+    }
+
+    .method.put {
+      color: var(--warn);
+      background: var(--amber);
+    }
+
+    .method.delete {
+      color: var(--bad);
+      background: var(--rose);
+    }
+
+    .endpoint-name {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+      margin-bottom: 5px;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .endpoint-name span:first-child,
+    .endpoint-path {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .endpoint-path {
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .lock {
+      display: inline-grid;
+      place-items: center;
+      min-width: 22px;
+      height: 22px;
+      color: #4e5b53;
+      background: #e7ece3;
+      border-radius: 5px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .workspace {
+      min-width: 0;
+      padding: 22px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(240px, 0.9fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 14px;
+    }
+
+    .label {
+      display: block;
+      margin: 0 0 7px;
+      color: #3f4a43;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .token-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 38px;
+    }
+
+    .icon-btn,
+    .primary-btn,
+    .ghost-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 38px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      font-weight: 800;
+      transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+    }
+
+    .primary-btn {
+      padding: 0 18px;
+      color: #fff;
+      background: var(--coal);
+      border-color: var(--coal);
+      box-shadow: 4px 4px 0 #aebaab;
+    }
+
+    .primary-btn:hover,
+    .icon-btn:hover,
+    .ghost-btn:hover {
+      transform: translate(-1px, -1px);
+    }
+
+    .primary-btn:hover {
+      box-shadow: 6px 6px 0 #aebaab;
+    }
+
+    .primary-btn:disabled {
+      cursor: wait;
+      opacity: 0.68;
+      transform: none;
+      box-shadow: 4px 4px 0 #aebaab;
+    }
+
+    .icon-btn {
+      width: 38px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .ghost-btn {
+      padding: 0 12px;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.94fr) minmax(0, 1.3fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(245, 247, 242, 0.92), rgba(255, 255, 255, 0.94));
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.2;
+    }
+
+    .panel-subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+      word-break: break-all;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      justify-content: flex-end;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 900;
+      color: #324038;
+      background: #e8eee4;
+      border: 1px solid #d1dacd;
+      white-space: nowrap;
+    }
+
+    .badge.open {
+      color: var(--ok);
+      background: var(--mint);
+      border-color: #a8d7b6;
+    }
+
+    .badge.protected {
+      color: #684118;
+      background: var(--amber);
+      border-color: #e0bb81;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .empty-note {
+      margin: 0 0 12px;
+      padding: 11px 12px;
+      color: var(--muted);
+      background: #f6f8f4;
+      border: 1px dashed #ccd6ca;
+      border-radius: 7px;
+      font-size: 13px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 16px 0 8px;
+    }
+
+    .section-title h3 {
+      margin: 0;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .mini-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .body-box,
+    .headers-box,
+    .response-box {
+      position: relative;
+    }
+
+    .body-box textarea,
+    .headers-box textarea {
+      display: block;
+    }
+
+    .response-panel {
+      min-height: calc(100vh - 80px);
+    }
+
+    .meter {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 9px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfa;
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 10px;
+      background: #f3f6f1;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+    }
+
+    .metric-label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      display: block;
+      overflow: hidden;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 900;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .metric.ok .metric-value {
+      color: var(--ok);
+    }
+
+    .metric.bad .metric-value {
+      color: var(--bad);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 7px;
+      padding: 12px 16px 0;
+      background: #fff;
+    }
+
+    .tab {
+      height: 32px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-bottom-color: #cfd6cc;
+      border-radius: 7px 7px 0 0;
+      background: #f5f7f2;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .tab.active {
+      color: var(--ink);
+      background: #fff;
+      border-bottom-color: #fff;
+    }
+
+    pre {
+      margin: 0;
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.62;
+      tab-size: 2;
+    }
+
+    .response-output {
+      min-height: 470px;
+      max-height: calc(100vh - 272px);
+      padding: 16px;
+      color: #deeadf;
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 28px 28px,
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+        #101713;
+      border-top: 1px solid #fff;
+    }
+
+    .curl-output {
+      display: none;
+      min-height: 470px;
+      max-height: calc(100vh - 272px);
+      padding: 16px;
+      color: #17201b;
+      background: #f9fbf7;
+      border-top: 1px solid #fff;
+    }
+
+    .response-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px 16px;
+      background: #fff;
+      border-top: 1px solid var(--line);
+    }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 10;
+      max-width: min(420px, calc(100vw - 44px));
+      padding: 12px 14px;
+      color: #fff;
+      background: var(--coal);
+      border-radius: 7px;
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      font-size: 13px;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 1100px) {
+      .topbar,
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      .response-panel {
+        min-height: auto;
+      }
+
+      .response-output,
+      .curl-output {
+        max-height: 520px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: relative;
+        height: auto;
+        max-height: 54vh;
+      }
+
+      .workspace {
+        padding: 14px;
+      }
+
+      .field-grid,
+      .meter {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">API</div>
+        <h1>Gin API Console</h1>
+        <p class="subtitle">左侧选择接口，右侧发送请求并查看统一响应 envelope。</p>
+        <p id="originWarning" class="origin-warning">当前页面通过 file:// 打开，浏览器 Origin 是 null。请重启使用更新后配置的后端，或改用 http://localhost:5173/api-console.html 打开。</p>
+      </div>
+      <div class="search-box">
+        <label class="label" for="endpointSearch">筛选接口</label>
+        <input id="endpointSearch" type="search" autocomplete="off" placeholder="health、login、users...">
+      </div>
+      <nav id="endpointList" class="endpoint-list" aria-label="API 列表"></nav>
+    </aside>
+
+    <main class="workspace">
+      <div class="topbar">
+        <label>
+          <span class="label">API 地址</span>
+          <input id="baseUrl" type="url" spellcheck="false" placeholder="http://localhost:5678">
+        </label>
+        <label class="token-row">
+          <span class="label">Bearer Token</span>
+          <input id="tokenInput" type="password" spellcheck="false" placeholder="登录成功后自动写入">
+        </label>
+        <div class="token-actions" aria-label="Token 操作">
+          <button id="toggleToken" class="icon-btn" type="button" title="显示或隐藏 token">Aa</button>
+          <button id="clearToken" class="icon-btn" type="button" title="清空 token">X</button>
+        </div>
+      </div>
+
+      <div class="split">
+        <section class="panel request-panel">
+          <div class="panel-head">
+            <div>
+              <h2 id="requestTitle" class="panel-title">请求</h2>
+              <p id="requestPath" class="panel-subtitle"></p>
+            </div>
+            <div id="requestBadges" class="badge-row"></div>
+          </div>
+          <div class="panel-body">
+            <div id="pathFields" class="field-grid"></div>
+            <div id="queryFields" class="field-grid"></div>
+
+            <div class="section-title">
+              <h3>Headers</h3>
+              <div class="mini-actions">
+                <button id="resetHeaders" class="ghost-btn" type="button">重置</button>
+              </div>
+            </div>
+            <div class="headers-box">
+              <textarea id="headersInput" spellcheck="false"></textarea>
+            </div>
+
+            <div class="section-title">
+              <h3>Body</h3>
+              <div class="mini-actions">
+                <button id="formatBody" class="ghost-btn" type="button">格式化</button>
+                <button id="resetBody" class="ghost-btn" type="button">重置</button>
+              </div>
+            </div>
+            <div id="bodyEmpty" class="empty-note hidden">这个接口不发送请求体。</div>
+            <div class="body-box">
+              <textarea id="bodyInput" spellcheck="false"></textarea>
+            </div>
+
+            <div class="section-title">
+              <h3>Action</h3>
+              <span id="requestUrlPreview" class="panel-subtitle"></span>
+            </div>
+            <button id="sendRequest" class="primary-btn" type="button">发送请求</button>
+          </div>
+        </section>
+
+        <section class="panel response-panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">返回</h2>
+              <p id="responseHint" class="panel-subtitle">等待请求</p>
+            </div>
+            <div class="badge-row">
+              <span id="statusBadge" class="badge">idle</span>
+            </div>
+          </div>
+
+          <div class="meter" aria-label="响应指标">
+            <div id="metricStatus" class="metric">
+              <span class="metric-label">Status</span>
+              <span id="statusValue" class="metric-value">-</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Time</span>
+              <span id="timeValue" class="metric-value">-</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Size</span>
+              <span id="sizeValue" class="metric-value">-</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Request ID</span>
+              <span id="requestIdValue" class="metric-value">-</span>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist">
+            <button id="bodyTab" class="tab active" type="button">Body</button>
+            <button id="headersTab" class="tab" type="button">Headers</button>
+            <button id="curlTab" class="tab" type="button">cURL</button>
+          </div>
+          <pre id="responseOutput" class="response-output">{}</pre>
+          <pre id="curlOutput" class="curl-output"></pre>
+
+          <div class="response-actions">
+            <button id="copyResponse" class="ghost-btn" type="button">复制返回</button>
+            <button id="copyCurl" class="ghost-btn" type="button">复制 cURL</button>
+            <button id="useNextCursor" class="ghost-btn hidden" type="button">使用 next_cursor</button>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const storageKeys = {
+      baseUrl: "gin-api-console-base-url",
+      token: "gin-api-console-token"
+    };
+    const requestTimeoutMs = 15000;
+
+    const endpoints = [
+      {
+        id: "healthz",
+        group: "System",
+        name: "Liveness",
+        method: "GET",
+        path: "/healthz",
+        auth: false
+      },
+      {
+        id: "readyz",
+        group: "System",
+        name: "Readiness",
+        method: "GET",
+        path: "/readyz",
+        auth: false
+      },
+      {
+        id: "auth-register",
+        group: "Auth",
+        name: "Register",
+        method: "POST",
+        path: "/api/v1/auth/register",
+        auth: false,
+        body: {
+          name: "Ada Byron",
+          email: "ada@example.com",
+          password: "valid-password"
+        }
+      },
+      {
+        id: "auth-login",
+        group: "Auth",
+        name: "Login",
+        method: "POST",
+        path: "/api/v1/auth/login",
+        auth: false,
+        body: {
+          email: "ada@example.com",
+          password: "valid-password"
+        },
+        capturesToken: true
+      },
+      {
+        id: "auth-me",
+        group: "Auth",
+        name: "Me",
+        method: "GET",
+        path: "/api/v1/auth/me",
+        auth: true
+      },
+      {
+        id: "auth-logout",
+        group: "Auth",
+        name: "Logout",
+        method: "POST",
+        path: "/api/v1/auth/logout",
+        auth: true
+      },
+      {
+        id: "users-list",
+        group: "Users",
+        name: "List Users",
+        method: "GET",
+        path: "/api/v1/users",
+        auth: true,
+        query: [
+          { name: "search", value: "" },
+          { name: "limit", value: "10" },
+          { name: "cursor", value: "" }
+        ]
+      },
+      {
+        id: "users-create",
+        group: "Users",
+        name: "Create User",
+        method: "POST",
+        path: "/api/v1/users",
+        auth: true,
+        body: {
+          name: "Grace Hopper",
+          email: "grace@example.com",
+          password: "valid-password"
+        }
+      },
+      {
+        id: "users-stats",
+        group: "Users",
+        name: "Stats",
+        method: "GET",
+        path: "/api/v1/users/stats",
+        auth: true
+      },
+      {
+        id: "users-get",
+        group: "Users",
+        name: "Get User",
+        method: "GET",
+        path: "/api/v1/users/:id",
+        auth: true,
+        pathParams: [
+          { name: "id", value: "user-id" }
+        ]
+      },
+      {
+        id: "users-update",
+        group: "Users",
+        name: "Update User",
+        method: "PUT",
+        path: "/api/v1/users/:id",
+        auth: true,
+        pathParams: [
+          { name: "id", value: "user-id" }
+        ],
+        body: {
+          name: "Grace Hopper",
+          email: "grace@example.com"
+        }
+      },
+      {
+        id: "users-delete",
+        group: "Users",
+        name: "Delete User",
+        method: "DELETE",
+        path: "/api/v1/users/:id",
+        auth: true,
+        pathParams: [
+          { name: "id", value: "user-id" }
+        ]
+      }
+    ];
+
+    const state = {
+      selectedId: endpoints[0].id,
+      responseBody: "{}",
+      responseHeaders: "",
+      curl: "",
+      lastJson: null
+    };
+
+    const els = {
+      endpointSearch: document.querySelector("#endpointSearch"),
+      endpointList: document.querySelector("#endpointList"),
+      baseUrl: document.querySelector("#baseUrl"),
+      tokenInput: document.querySelector("#tokenInput"),
+      toggleToken: document.querySelector("#toggleToken"),
+      clearToken: document.querySelector("#clearToken"),
+      originWarning: document.querySelector("#originWarning"),
+      requestTitle: document.querySelector("#requestTitle"),
+      requestPath: document.querySelector("#requestPath"),
+      requestBadges: document.querySelector("#requestBadges"),
+      pathFields: document.querySelector("#pathFields"),
+      queryFields: document.querySelector("#queryFields"),
+      headersInput: document.querySelector("#headersInput"),
+      bodyInput: document.querySelector("#bodyInput"),
+      bodyEmpty: document.querySelector("#bodyEmpty"),
+      resetHeaders: document.querySelector("#resetHeaders"),
+      resetBody: document.querySelector("#resetBody"),
+      formatBody: document.querySelector("#formatBody"),
+      requestUrlPreview: document.querySelector("#requestUrlPreview"),
+      sendRequest: document.querySelector("#sendRequest"),
+      responseHint: document.querySelector("#responseHint"),
+      statusBadge: document.querySelector("#statusBadge"),
+      metricStatus: document.querySelector("#metricStatus"),
+      statusValue: document.querySelector("#statusValue"),
+      timeValue: document.querySelector("#timeValue"),
+      sizeValue: document.querySelector("#sizeValue"),
+      requestIdValue: document.querySelector("#requestIdValue"),
+      bodyTab: document.querySelector("#bodyTab"),
+      headersTab: document.querySelector("#headersTab"),
+      curlTab: document.querySelector("#curlTab"),
+      responseOutput: document.querySelector("#responseOutput"),
+      curlOutput: document.querySelector("#curlOutput"),
+      copyResponse: document.querySelector("#copyResponse"),
+      copyCurl: document.querySelector("#copyCurl"),
+      useNextCursor: document.querySelector("#useNextCursor"),
+      toast: document.querySelector("#toast")
+    };
+
+    function currentEndpoint() {
+      return endpoints.find((endpoint) => endpoint.id === state.selectedId) || endpoints[0];
+    }
+
+    function methodClass(method) {
+      return method.toLowerCase();
+    }
+
+    function defaultHeaders(endpoint) {
+      const headers = {};
+      if (endpoint.body !== undefined) {
+        headers["Content-Type"] = "application/json";
+      }
+      return headers;
+    }
+
+    function pretty(value) {
+      return JSON.stringify(value, null, 2);
+    }
+
+    function parseHeadersInput() {
+      const raw = els.headersInput.value.trim();
+      if (!raw) {
+        return {};
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("headers must be an object");
+        }
+        return parsed;
+      } catch (error) {
+        throw new Error("Headers 不是有效 JSON 对象");
+      }
+    }
+
+    function parseBodyInput(endpoint) {
+      if (endpoint.body === undefined) {
+        return undefined;
+      }
+      const raw = els.bodyInput.value.trim();
+      if (!raw) {
+        return "";
+      }
+      try {
+        return JSON.parse(raw);
+      } catch (error) {
+        throw new Error("Body 不是有效 JSON");
+      }
+    }
+
+    function renderEndpoints() {
+      const keyword = els.endpointSearch.value.trim().toLowerCase();
+      const groups = new Map();
+      endpoints
+        .filter((endpoint) => {
+          const haystack = `${endpoint.group} ${endpoint.name} ${endpoint.method} ${endpoint.path}`.toLowerCase();
+          return haystack.includes(keyword);
+        })
+        .forEach((endpoint) => {
+          if (!groups.has(endpoint.group)) {
+            groups.set(endpoint.group, []);
+          }
+          groups.get(endpoint.group).push(endpoint);
+        });
+
+      els.endpointList.innerHTML = "";
+      groups.forEach((items, group) => {
+        const title = document.createElement("div");
+        title.className = "group-title";
+        title.textContent = group;
+        els.endpointList.appendChild(title);
+
+        items.forEach((endpoint) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `endpoint ${endpoint.id === state.selectedId ? "active" : ""}`;
+          button.dataset.id = endpoint.id;
+          button.innerHTML = `
+            <span class="method ${methodClass(endpoint.method)}">${endpoint.method}</span>
+            <span>
+              <span class="endpoint-name">
+                <span>${endpoint.name}</span>
+                ${endpoint.auth ? '<span class="lock" title="需要 Bearer token">JWT</span>' : ""}
+              </span>
+              <span class="endpoint-path">${endpoint.path}</span>
+            </span>
+          `;
+          els.endpointList.appendChild(button);
+        });
+      });
+    }
+
+    function renderFields(container, fields, type) {
+      container.innerHTML = "";
+      if (!fields || fields.length === 0) {
+        return;
+      }
+      fields.forEach((field) => {
+        const label = document.createElement("label");
+        label.className = "field";
+        label.innerHTML = `
+          <span class="label">${type}: ${field.name}</span>
+          <input data-${type}="${field.name}" value="${escapeAttribute(field.value || "")}" spellcheck="false">
+        `;
+        container.appendChild(label);
+      });
+    }
+
+    function renderRequest() {
+      const endpoint = currentEndpoint();
+      els.requestTitle.textContent = endpoint.name;
+      els.requestPath.textContent = `${endpoint.method} ${endpoint.path}`;
+      els.requestBadges.innerHTML = `
+        <span class="method ${methodClass(endpoint.method)}">${endpoint.method}</span>
+        <span class="badge ${endpoint.auth ? "protected" : "open"}">${endpoint.auth ? "Bearer" : "Public"}</span>
+      `;
+      renderFields(els.pathFields, endpoint.pathParams, "path");
+      renderFields(els.queryFields, endpoint.query, "query");
+      els.headersInput.value = pretty(defaultHeaders(endpoint));
+      els.bodyInput.value = endpoint.body === undefined ? "" : pretty(endpoint.body);
+      els.bodyInput.disabled = endpoint.body === undefined;
+      els.bodyEmpty.classList.toggle("hidden", endpoint.body !== undefined);
+      updateUrlPreview();
+    }
+
+    function escapeAttribute(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function selectedPath() {
+      const endpoint = currentEndpoint();
+      let path = endpoint.path;
+      document.querySelectorAll("[data-path]").forEach((input) => {
+        path = path.replace(`:${input.dataset.path}`, encodeURIComponent(input.value.trim()));
+      });
+      return path;
+    }
+
+    function selectedQuery() {
+      const params = new URLSearchParams();
+      document.querySelectorAll("[data-query]").forEach((input) => {
+        const value = input.value.trim();
+        if (value !== "") {
+          params.set(input.dataset.query, value);
+        }
+      });
+      const query = params.toString();
+      return query ? `?${query}` : "";
+    }
+
+    function normalizedBaseUrl() {
+      return els.baseUrl.value.trim().replace(/\/+$/, "");
+    }
+
+    function requestUrl() {
+      return `${normalizedBaseUrl()}${selectedPath()}${selectedQuery()}`;
+    }
+
+    function updateUrlPreview() {
+      els.requestUrlPreview.textContent = requestUrl();
+      state.curl = buildCurl();
+      updateCurlOutput();
+    }
+
+    function buildCurl() {
+      const endpoint = currentEndpoint();
+      const parts = [`curl -i -X ${endpoint.method} '${requestUrl()}'`];
+      let headers = {};
+      try {
+        headers = parseHeadersInput();
+      } catch (error) {
+        headers = defaultHeaders(endpoint);
+      }
+      const token = els.tokenInput.value.trim();
+      if (endpoint.auth && token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      Object.entries(headers).forEach(([key, value]) => {
+        if (value !== "") {
+          parts.push(`  -H '${key}: ${String(value).replace(/'/g, "'\\''")}'`);
+        }
+      });
+      if (endpoint.body !== undefined && els.bodyInput.value.trim()) {
+        parts.push(`  --data '${els.bodyInput.value.trim().replace(/'/g, "'\\''")}'`);
+      }
+      return parts.join(" \\\n");
+    }
+
+    function setActiveTab(tab) {
+      [els.bodyTab, els.headersTab, els.curlTab].forEach((button) => button.classList.remove("active"));
+      els.responseOutput.style.display = tab === "curl" ? "none" : "block";
+      els.curlOutput.style.display = tab === "curl" ? "block" : "none";
+
+      if (tab === "body") {
+        els.bodyTab.classList.add("active");
+        els.responseOutput.textContent = state.responseBody;
+      } else if (tab === "headers") {
+        els.headersTab.classList.add("active");
+        els.responseOutput.textContent = state.responseHeaders || "(no headers)";
+      } else {
+        els.curlTab.classList.add("active");
+        updateCurlOutput();
+      }
+    }
+
+    function updateCurlOutput() {
+      state.curl = buildCurl();
+      els.curlOutput.textContent = state.curl;
+    }
+
+    function bytes(value) {
+      const count = new Blob([value]).size;
+      if (count < 1024) {
+        return `${count} B`;
+      }
+      return `${(count / 1024).toFixed(1)} KB`;
+    }
+
+    function setToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      window.clearTimeout(setToast.timer);
+      setToast.timer = window.setTimeout(() => {
+        els.toast.classList.remove("show");
+      }, 2100);
+    }
+
+    async function copyText(value, label) {
+      try {
+        await navigator.clipboard.writeText(value);
+        setToast(`${label}已复制`);
+      } catch (error) {
+        setToast("当前浏览器不允许复制");
+      }
+    }
+
+    function updateToken(value) {
+      els.tokenInput.value = value || "";
+      if (value) {
+        localStorage.setItem(storageKeys.token, value);
+      } else {
+        localStorage.removeItem(storageKeys.token);
+      }
+      updateUrlPreview();
+    }
+
+    function captureToken(endpoint, json) {
+      const token = json && json.data && json.data.access_token;
+      if (endpoint.capturesToken && token) {
+        updateToken(token);
+        setToast("token 已写入");
+      }
+    }
+
+    function updateNextCursor(json) {
+      const cursor = json && json.data && json.data.next_cursor;
+      els.useNextCursor.classList.toggle("hidden", !cursor);
+      els.useNextCursor.dataset.cursor = cursor || "";
+    }
+
+    function headersToText(headers) {
+      const lines = [];
+      headers.forEach((value, key) => {
+        lines.push(`${key}: ${value}`);
+      });
+      return lines.join("\n");
+    }
+
+    function requestIdFrom(headers, json) {
+      return headers.get("x-request-id") || (json && json.request_id) || "-";
+    }
+
+    async function sendRequest() {
+      const endpoint = currentEndpoint();
+      let headers;
+      let body;
+      try {
+        headers = parseHeadersInput();
+        body = parseBodyInput(endpoint);
+      } catch (error) {
+        setToast(error.message);
+        return;
+      }
+
+      const token = els.tokenInput.value.trim();
+      if (endpoint.auth && token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const init = {
+        method: endpoint.method,
+        headers
+      };
+      if (endpoint.body !== undefined) {
+        init.body = typeof body === "string" ? body : JSON.stringify(body);
+      }
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+      init.signal = controller.signal;
+
+      els.sendRequest.disabled = true;
+      els.responseHint.textContent = "请求中";
+      els.statusBadge.textContent = "pending";
+      els.statusValue.textContent = "-";
+      els.timeValue.textContent = "-";
+      els.sizeValue.textContent = "-";
+      els.requestIdValue.textContent = "-";
+      els.metricStatus.className = "metric";
+      setActiveTab("body");
+
+      const started = performance.now();
+      try {
+        const response = await fetch(requestUrl(), init);
+        const elapsed = Math.round(performance.now() - started);
+        const text = await response.text();
+        let json = null;
+        if (text) {
+          try {
+            json = JSON.parse(text);
+          } catch (error) {
+            json = null;
+          }
+        }
+
+        state.lastJson = json;
+        state.responseBody = text ? (json ? pretty(json) : text) : "(204 No Content)";
+        state.responseHeaders = headersToText(response.headers);
+        captureToken(endpoint, json);
+        updateNextCursor(json);
+
+        els.statusValue.textContent = `${response.status} ${response.statusText || ""}`.trim();
+        els.timeValue.textContent = `${elapsed} ms`;
+        els.sizeValue.textContent = bytes(text);
+        els.requestIdValue.textContent = requestIdFrom(response.headers, json);
+        els.statusBadge.textContent = response.ok ? "success" : "error";
+        els.statusBadge.className = `badge ${response.ok ? "open" : "protected"}`;
+        els.metricStatus.className = `metric ${response.ok ? "ok" : "bad"}`;
+        els.responseHint.textContent = requestUrl();
+        setActiveTab("body");
+      } catch (error) {
+        const message = error.name === "AbortError"
+          ? `request timed out after ${requestTimeoutMs / 1000}s`
+          : error.message;
+        state.lastJson = null;
+        state.responseBody = pretty({
+          success: false,
+          error: {
+            code: "request_failed",
+            message
+          }
+        });
+        state.responseHeaders = "";
+        els.statusValue.textContent = "network error";
+        els.timeValue.textContent = `${Math.round(performance.now() - started)} ms`;
+        els.sizeValue.textContent = bytes(state.responseBody);
+        els.requestIdValue.textContent = "-";
+        els.statusBadge.textContent = "failed";
+        els.statusBadge.className = "badge protected";
+        els.metricStatus.className = "metric bad";
+        els.responseHint.textContent = requestUrl();
+        els.useNextCursor.classList.add("hidden");
+        setActiveTab("body");
+      } finally {
+        window.clearTimeout(timeoutId);
+        els.sendRequest.disabled = false;
+      }
+    }
+
+    function init() {
+      els.originWarning.classList.toggle("show", window.location.protocol === "file:");
+      els.baseUrl.value = localStorage.getItem(storageKeys.baseUrl) || "http://localhost:5678";
+      els.tokenInput.value = localStorage.getItem(storageKeys.token) || "";
+      renderEndpoints();
+      renderRequest();
+      setActiveTab("body");
+
+      els.endpointList.addEventListener("click", (event) => {
+        const button = event.target.closest(".endpoint");
+        if (!button) {
+          return;
+        }
+        state.selectedId = button.dataset.id;
+        renderEndpoints();
+        renderRequest();
+      });
+
+      els.endpointSearch.addEventListener("input", renderEndpoints);
+
+      els.baseUrl.addEventListener("input", () => {
+        localStorage.setItem(storageKeys.baseUrl, els.baseUrl.value.trim());
+        updateUrlPreview();
+      });
+
+      els.tokenInput.addEventListener("input", () => {
+        updateToken(els.tokenInput.value.trim());
+      });
+
+      els.toggleToken.addEventListener("click", () => {
+        els.tokenInput.type = els.tokenInput.type === "password" ? "text" : "password";
+      });
+
+      els.clearToken.addEventListener("click", () => {
+        updateToken("");
+        setToast("token 已清空");
+      });
+
+      els.pathFields.addEventListener("input", updateUrlPreview);
+      els.queryFields.addEventListener("input", updateUrlPreview);
+      els.headersInput.addEventListener("input", updateUrlPreview);
+      els.bodyInput.addEventListener("input", updateUrlPreview);
+
+      els.resetHeaders.addEventListener("click", () => {
+        els.headersInput.value = pretty(defaultHeaders(currentEndpoint()));
+        updateUrlPreview();
+      });
+
+      els.resetBody.addEventListener("click", () => {
+        const endpoint = currentEndpoint();
+        els.bodyInput.value = endpoint.body === undefined ? "" : pretty(endpoint.body);
+        updateUrlPreview();
+      });
+
+      els.formatBody.addEventListener("click", () => {
+        if (els.bodyInput.disabled || !els.bodyInput.value.trim()) {
+          return;
+        }
+        try {
+          els.bodyInput.value = pretty(JSON.parse(els.bodyInput.value));
+          updateUrlPreview();
+        } catch (error) {
+          setToast("Body 不是有效 JSON");
+        }
+      });
+
+      els.sendRequest.addEventListener("click", sendRequest);
+      els.bodyTab.addEventListener("click", () => setActiveTab("body"));
+      els.headersTab.addEventListener("click", () => setActiveTab("headers"));
+      els.curlTab.addEventListener("click", () => setActiveTab("curl"));
+      els.copyResponse.addEventListener("click", () => copyText(state.responseBody, "返回"));
+      els.copyCurl.addEventListener("click", () => copyText(state.curl, "cURL"));
+      els.useNextCursor.addEventListener("click", () => {
+        const cursor = els.useNextCursor.dataset.cursor;
+        const input = document.querySelector('[data-query="cursor"]');
+        if (input && cursor) {
+          input.value = cursor;
+          updateUrlPreview();
+          setToast("next_cursor 已填入");
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

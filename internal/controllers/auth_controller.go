@@ -13,13 +13,39 @@ import (
 )
 
 type AuthHandler struct {
-	service *services.AuthService
+	service      *services.AuthService
+	usersService *services.UsersService
 }
 
-func NewAuthHandler(service *services.AuthService) *AuthHandler {
+func NewAuthHandler(service *services.AuthService, usersService *services.UsersService) *AuthHandler {
 	return &AuthHandler{
-		service: service,
+		service:      service,
+		usersService: usersService,
 	}
+}
+
+func (h *AuthHandler) Register(c *gin.Context) {
+	if h.usersService == nil {
+		response.Error(c, apperr.New(http.StatusServiceUnavailable, "registration_unavailable", "registration is unavailable"))
+		return
+	}
+
+	var req models.CreateUserRequest
+	if !response.BindJSON(c, &req) {
+		return
+	}
+
+	user, err := h.usersService.Create(c.Request.Context(), models.CreateUserInput{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+
+	response.Created(c, user)
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {

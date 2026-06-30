@@ -67,8 +67,8 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	v1 := router.Group("/api/v1")
 	v1.Use(middleware.RateLimit(deps.Config.RateLimit))
 
-	if deps.AuthService != nil {
-		registerPublicAuthRoutes(v1, deps.AuthService)
+	if deps.AuthService != nil || deps.UsersService != nil {
+		registerPublicAuthRoutes(v1, deps.AuthService, deps.UsersService)
 	}
 
 	protected := v1.Group("")
@@ -100,15 +100,20 @@ func RegisterRoutes(router *gin.RouterGroup, deps RouteDeps) {
 	}
 }
 
-func registerPublicAuthRoutes(router *gin.RouterGroup, authService *services.AuthService) {
-	authHandler := controllers.NewAuthHandler(authService)
+func registerPublicAuthRoutes(router *gin.RouterGroup, authService *services.AuthService, usersService *services.UsersService) {
+	authHandler := controllers.NewAuthHandler(authService, usersService)
 
 	auth := router.Group("/auth")
-	auth.POST("/login", authHandler.Login)
+	if usersService != nil {
+		auth.POST("/register", authHandler.Register)
+	}
+	if authService != nil {
+		auth.POST("/login", authHandler.Login)
+	}
 }
 
 func registerProtectedAuthRoutes(router *gin.RouterGroup, authService *services.AuthService) {
-	authHandler := controllers.NewAuthHandler(authService)
+	authHandler := controllers.NewAuthHandler(authService, nil)
 
 	auth := router.Group("/auth")
 	auth.POST("/logout", authHandler.Logout)

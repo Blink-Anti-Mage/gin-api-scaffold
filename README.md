@@ -24,6 +24,8 @@
 go run ./cmd -c configs/local.example.json
 ```
 
+`configs/local.example.json` 默认开启 JWT，并带有本地开发用 secret。
+
 ## 目录规矩
 
 - `cmd/`：应用启动入口，只负责加载配置、初始化 logger、启动 app。
@@ -63,6 +65,7 @@ v1.Use(middleware.RateLimit(deps.Config.RateLimit))
 
 认证入口按公开和受保护路由拆分：
 
+- `POST /api/v1/auth/register`：公开；创建用户账号，成功返回 `201` 和用户信息。
 - `POST /api/v1/auth/login`：公开；用 `email + password` 登录并签发 JWT。
 - `POST /api/v1/auth/logout`：受保护；吊销当前 JWT 的 `jti`。
 - `GET /api/v1/auth/me`：受保护；返回当前 JWT claims 中的用户信息。
@@ -120,6 +123,19 @@ JWT middleware 使用 `github.com/golang-jwt/jwt/v5`，不要手写 base64、cla
 
 没有 Bearer token 时返回 `missing_token`。
 
+注册请求示例：
+
+```http
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{
+  "name": "Ada Byron",
+  "email": "ada@example.com",
+  "password": "valid-password"
+}
+```
+
 登录请求示例：
 
 ```http
@@ -132,7 +148,7 @@ Content-Type: application/json
 }
 ```
 
-首次用户建议在 `auth.enabled=false` 时通过 `POST /api/v1/users` 创建，或由你自己的迁移/后台流程写入 bcrypt 格式的 `password_hash`；示例 SQL 只提供字段，不内置固定密码账号。
+首次用户可以通过公开的 `POST /api/v1/auth/register` 创建；`POST /api/v1/users` 仍保留为用户管理接口，开启 `auth.enabled` 后受 JWT 保护。示例 SQL 只提供字段，不内置固定密码账号。
 
 ## 响应规矩
 
@@ -312,6 +328,7 @@ GET /api/v1/users?search=ada&limit=10&cursor=<next_cursor>
 
 行为约定：
 
+- 公开用户注册使用 `POST /api/v1/auth/register`，复用同一套创建校验和密码 hash。
 - 不存在的用户返回 `404 not_found`。
 - 邮箱重复返回 `409 user_email_exists`。
 - Create/Update 入库前先做 service 业务校验。
