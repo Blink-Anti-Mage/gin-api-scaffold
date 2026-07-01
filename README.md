@@ -6,7 +6,7 @@
 
 - Gin HTTP API
 - PostgreSQL / pgx
-- 分层架构：controllers / services / repository / models
+- 分层架构：handler / services / repository / models
 - Config loader
 - Request ID
 - Logger
@@ -30,7 +30,7 @@ go run ./cmd -c configs/local.example.json
 
 - `cmd/`：应用启动入口，只负责加载配置、初始化 logger、启动 app。
 - `internal/app`：应用装配、路由注册、server 生命周期。
-- `internal/controllers`：Controller 层，只处理 HTTP 输入输出；文件直接按模块命名，例如 `auth_controller.go`、`user_controller.go`。
+- `internal/handler`：Handler 层，只处理 HTTP 输入输出；文件直接按模块命名，例如 `auth_handler.go`、`user_handler.go`。
 - `internal/services`：Service 层，放业务规则、输入 normalize、业务校验、分页 cursor 编解码；文件直接按模块命名，例如 `auth_service.go`、`user_service.go`。
 - `internal/repository`：Repository 层，只处理数据库访问、DB 连接和数据库错误映射；文件直接按模块命名，例如 `user_repository.go`、`postgres.go`。
 - `internal/models`：Model 层，放 request/input/filter/response/domain models；文件直接按模块命名，例如 `auth.go`、`user.go`。
@@ -41,7 +41,7 @@ go run ./cmd -c configs/local.example.json
 - `internal/apperr`：统一业务错误结构和错误码。
 - `internal/middleware`：通用中间件，例如 request id、logger、JWT、rate limit、cursor pagination。
 
-新增模块时优先复制这个分层方式：不要在 `internal/controllers`、`internal/services`、`internal/repository`、`internal/models` 下再建业务二级目录，直接新增 `<module>_controller.go`、`<module>_service.go`、`<module>_repository.go` 和 `<module>.go`。
+新增模块时优先复制这个分层方式：不要在 `internal/handler`、`internal/services`、`internal/repository`、`internal/models` 下再建业务二级目录，直接新增 `<module>_handler.go`、`<module>_service.go`、`<module>_repository.go` 和 `<module>.go`。
 
 ## 路由规矩
 
@@ -152,7 +152,7 @@ Content-Type: application/json
 
 ## 响应规矩
 
-所有 JSON 响应都走 `pkg/response`，不要在业务 controller 里直接 `c.JSON`。
+所有 JSON 响应都走 `pkg/response`，不要在业务 handler 里直接 `c.JSON`。
 
 成功响应 envelope：
 
@@ -249,7 +249,7 @@ List 接口使用 cursor 模式，不使用 `offset`。
 - `limit`：可选；空值或 `<=0` 使用默认值；超过 `MaxLimit` 会截断；非整数返回 `400 invalid_query`。
 - `cursor`：可选；作为 opaque string 传给 service。
 
-Controller 从 Gin context 读取中间件解析后的分页参数：
+Handler 从 Gin context 读取中间件解析后的分页参数：
 
 ```go
 pagination, _ := middleware.CurrentCursorPagination(c)

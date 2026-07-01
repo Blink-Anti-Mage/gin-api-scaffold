@@ -9,7 +9,7 @@ import (
 
 	"github.com/example/gin-api-scaffold/internal/apperr"
 	"github.com/example/gin-api-scaffold/internal/config"
-	"github.com/example/gin-api-scaffold/internal/controllers"
+	"github.com/example/gin-api-scaffold/internal/handler"
 	"github.com/example/gin-api-scaffold/internal/middleware"
 	"github.com/example/gin-api-scaffold/internal/services"
 	"github.com/example/gin-api-scaffold/pkg/response"
@@ -52,7 +52,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 	router.Use(middleware.CORS(deps.Config.CORS))
 	router.Use(middleware.BodySizeLimit(deps.Config.HTTP.MaxBodyBytes))
 
-	readinessChecks := map[string]controllers.ReadinessCheck{}
+	readinessChecks := map[string]handler.ReadinessCheck{}
 	if deps.Database != nil {
 		name := deps.ReadinessName
 		if name == "" {
@@ -60,7 +60,7 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		}
 		readinessChecks[name] = deps.Database.Ping
 	}
-	health := controllers.NewHealth(readinessChecks)
+	health := handler.NewHealth(readinessChecks)
 	router.GET("/healthz", health.Liveness)
 	router.GET("/readyz", health.Readiness)
 
@@ -101,7 +101,7 @@ func RegisterRoutes(router *gin.RouterGroup, deps RouteDeps) {
 }
 
 func registerPublicAuthRoutes(router *gin.RouterGroup, authService *services.AuthService, usersService *services.UsersService) {
-	authHandler := controllers.NewAuthHandler(authService, usersService)
+	authHandler := handler.NewAuthHandler(authService, usersService)
 
 	auth := router.Group("/auth")
 	if usersService != nil {
@@ -113,7 +113,7 @@ func registerPublicAuthRoutes(router *gin.RouterGroup, authService *services.Aut
 }
 
 func registerProtectedAuthRoutes(router *gin.RouterGroup, authService *services.AuthService) {
-	authHandler := controllers.NewAuthHandler(authService, nil)
+	authHandler := handler.NewAuthHandler(authService, nil)
 
 	auth := router.Group("/auth")
 	auth.POST("/logout", authHandler.Logout)
@@ -121,7 +121,7 @@ func registerProtectedAuthRoutes(router *gin.RouterGroup, authService *services.
 }
 
 func registerUserRoutes(router *gin.RouterGroup, usersService *services.UsersService) {
-	usersHandler := controllers.NewUsersHandler(usersService)
+	usersHandler := handler.NewUsersHandler(usersService)
 
 	users := router.Group("/users")
 	users.GET("", middleware.CursorPagination(middleware.CursorPaginationConfig{
